@@ -1,32 +1,39 @@
-class Piece:
-    display_text = None
-    team = None
-    piece_type = None
-    moved = None 
-
-    def __init__(self, team, piece_type):
-        self.team = team
-        self.piece_type = piece_type
-        self.display_text = team + piece_type
-        self.moved = False
-        
+import piece as chess_piece
 
 class Board:
     grid = []
     rows = 8
     colors = ['W', 'B']
     pieces = ['P', 'R', 'H', 'B', 'Q', 'K']
-    king_pos = None
 
-    def __init__(self, grid = None):
-        self.king_pos = [[7, 4], [0, 4]]
-        if (grid is None):
+    def __init__(self, grid = None, king_pos = [[7, 4], [0, 4]]):
+        self.king_pos = king_pos
+        if grid is None:
             for i in range(self.rows):
                 self.grid.append([])
                 for j in range(self.rows):
                     self.grid[i].append([self.colors[(i+j)%2], None])
         else:
             self.grid = grid
+
+    def __deepcopy__(self, memodict={}):
+        copy_grid = []
+        for row in range(self.rows):
+            copy_grid.append([])
+            for col in range(self.rows):
+                piece = self.get_piece(row, col)
+                if piece is not None:
+                    copy_grid[row].append([self.grid[row][col][0], piece.__copy__()])
+                else:
+                    copy_grid[row].append([self.grid[row][col][0], None])
+
+        copy_king_pos = list(map(lambda pos : [pos[0], pos[1]], self.king_pos))
+        return Board(copy_grid, copy_king_pos)
+
+    def clear_board(self):
+        for row in self.grid:
+            for i in range(self.rows):
+                row[i][1] = None
 
     def in_range(self, row, column):
         return row < self.rows and row >= 0 and column < self.rows and column >= 0
@@ -38,31 +45,58 @@ class Board:
 
     def set_piece(self, row, column, piece):
         assert(self.in_range(row, column))
+        if piece is not None and piece.piece_type == 'K':
+            self.king_pos[self.colors.index(piece.team)] = [row, column]
         self.grid[row][column][1] = piece
+
+    def move_piece(self, r1, c1, r2, c2, team):
+        piece = self.get_piece(r1, c1)
+        valid_moves = self.compute_valid_moves(r1, c1, team)
+
+        if (len(list(filter(lambda move: move == [r2, c2], valid_moves))) == 0):
+            print("Invalid move")
+            return False
+
+        destination = self.get_piece(r2, c2)
+
+        self.set_piece(r1, c1, None)
+        self.set_piece(r2, c2, piece)
+
+        if (destination is not None and destination.piece_type == 'K'):
+            print(piece.team + " wins!\n")
+
+        piece.moved = True
+
+        return piece.moved
 
     def setup_pieces(self):
         for i in range(self.rows):
-            self.set_piece(6, i, Piece('W', 'P'))
-            self.set_piece(1, i, Piece('B', 'P'))
+            self.set_piece(6, i, chess_piece.Piece('W', 'P'))
+            self.set_piece(1, i, chess_piece.Piece('B', 'P'))
 
         # Rooks, Horses, Bishops
         i = 0
         while (i < 3):
-            self.set_piece(0, i, Piece('B', self.pieces[i+1]))
-            self.set_piece(0, self.rows-(i+1), Piece('B', self.pieces[i+1]))
-            self.set_piece(self.rows-1, i, Piece('W', self.pieces[i+1]))
-            self.set_piece(self.rows-1, self.rows-(i+1), Piece('W', self.pieces[i+1]))
+            self.set_piece(0, i, chess_piece.Piece('B', self.pieces[i+1]))
+            self.set_piece(0, self.rows-(i+1), chess_piece.Piece('B', self.pieces[i+1]))
+            self.set_piece(self.rows-1, i, chess_piece.Piece('W', self.pieces[i+1]))
+            self.set_piece(self.rows-1, self.rows-(i+1), chess_piece.Piece('W', self.pieces[i+1]))
             i += 1
 
         # Queen
-        self.set_piece(0, 3, Piece('B', self.pieces[4]))
-        self.set_piece(self.rows-1, 3, Piece('W', self.pieces[4]))
+        self.set_piece(0, 3, chess_piece.Piece('B', self.pieces[4]))
+        self.set_piece(self.rows-1, 3, chess_piece.Piece('W', self.pieces[4]))
 
         # King
-        self.set_piece(0, 4, Piece('B', self.pieces[5]))
-        self.set_piece(self.rows-1, 4, Piece('W', self.pieces[5]))
+        self.set_piece(0, 4, chess_piece.Piece('B', self.pieces[5]))
+        self.set_piece(self.rows-1, 4, chess_piece.Piece('W', self.pieces[5]))
 
-    def position_in_check(self, r1, c1):
+    def position_in_check(self, side):
+
+        i = self.colors.index(side)
+        r1 = self.king_pos[i][0]
+        c1 = self.king_pos[i][1]
+
         king_piece = self.get_piece(r1, c1)
         for row in range(self.rows):
             for col in range(self.rows):
@@ -75,28 +109,31 @@ class Board:
 
     def check_checkmate(self, side):
         
-        r1 = self.king_pos[0][0]
-        c1 = self.king_pos[0][1]
-
-        if (side == 'B'):
-            r1 = self.king_pos[1][0]
-            c1 = self.king_pos[1][1]
+        i = self.colors.index(side)
+        r1 = self.king_pos[i][0]
+        c1 = self.king_pos[i][1]
 
         king = self.get_piece(r1, c1)
 
-        if (not self.position_in_check(r1, c1)):
+        if (not self.position_in_check(side)):
             return False
         for row in range(self.rows):
             for col in range(self.rows):
                 piece = self.get_piece(row, col)
                 if (piece is not None and piece.team == king.team):
-                    moves = self.compute_valid_moves(r1, c1)
+                    moves = self.compute_valid_moves(row, col, piece.team)
                     for move in moves:
-                        temp_state = Board(self.grid)
+                        temp_state = self.__deepcopy__({})
                         temp_state.move_piece(row, col, move[0], move[1], piece.team)
-                        if (not temp_state.position_in_check(r1, c1)):
+                        if (not temp_state.position_in_check(side)):
                             return False
         return True
+
+    def results_in_check(self, r1, c1, move):
+        assert self.get_piece(r1, c1) is not None
+        temp_state = self.__deepcopy__({})
+        temp_state.move_piece(r1, c1, move[0], move[1], temp_state.get_piece(r1, c1).team)
+        return temp_state.position_in_check(temp_state.get_piece(r1, c1).team)
 
     def compute_valid_moves(self, r1, c1, team):
 
@@ -123,29 +160,16 @@ class Board:
                 valid_moves.append([r1 + (direction * 1), c1 - 1])
 
         if (piece.piece_type == 'R' or piece.piece_type == 'Q'):
-            # Check vertical
-            i = 1
-            while (self.in_range(r1 + (direction * i), c1) and self.get_piece(r1 + (direction * i), c1) is None):
-                valid_moves.append([r1 + (direction * i), c1])
-                i += 1
-            if (self.in_range(r1 + (direction * i), c1) and self.get_piece(r1 + (direction * i), c1).team != piece.team):
-                valid_moves.append([r1 + (direction * i), c1])
+            signs = [[1, 0], [0, 1], [-1, 0], [0, -1]]
 
-            # Check horizontal right
-            i = 1
-            while (self.in_range(r1, c1 + i) and self.get_piece(r1, c1 + i) is None):
-                valid_moves.append([r1, c1 + i])
-                i += 1
-            if (self.in_range(r1, c1 + i) and self.get_piece(r1, c1 + i).team != piece.team):
-                valid_moves.append([r1, c1 + i])
+            for sign in signs:
+                i = 1
+                while (self.in_range(r1 + (sign[0] * i), c1 + (sign[1] * i)) and self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)) is None):
+                    valid_moves.append([r1 + (sign[0] * i), c1 + (sign[1] * i)])
+                    i += 1
+                if (self.in_range(r1 + (sign[0] * i), c1 + (sign[1] * i)) and self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)).team != piece.team):
+                    valid_moves.append([r1 + (sign[0] * i), c1 + (sign[1] * i)])
 
-            # Check horizontal left
-            i = 1
-            while (self.in_range(r1, c1 - i) and self.get_piece(r1, c1 - i) is None):
-                valid_moves.append([r1, c1 - i])
-                i += 1
-            if (self.in_range(r1, c1 - i) and self.get_piece(r1, c1 - i).team != piece.team):
-                valid_moves.append([r1, c1 - i])
 
         if (piece.piece_type == 'H'):
             signs = [[1, 1], [1, -1], [-1, 1], [-1, -1]]
@@ -153,7 +177,7 @@ class Board:
             for sign in signs:
                 if (self.in_range(r1 + (sign[0] * 1), c1 + (sign[1] * 2)) and (self.get_piece(r1 + 1, c1 + 2) is None or self.get_piece(r1 + 1, c1 + 2).team != piece.team)):
                     valid_moves.append([r1 + (sign[0] * 1), c1 + (sign[1] * 2)])
-                if (self.in_range(r1 + (sign[0] * 2), c1 + (sign[1] * 1)) and (self.get_piece(r1 + 2, c1 + 1) is None or self.get_piece(r1 + 2, c1 + 1).team != piece.team)):
+                if (self.in_range(r1 + (sign[0] * 2), c1 + (sign[1] * 1)) and (self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)) is None or self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)).team != piece.team)):
                     valid_moves.append([r1 + (sign[0] * 2), c1 + (sign[1] * 1)])
 
 
@@ -165,42 +189,21 @@ class Board:
                 while (self.in_range(r1 + (sign[0] * i), c1 + (sign[1] * i)) and self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)) is None):
                     valid_moves.append([r1 + (sign[0] * i), c1 + (sign[1] * i)])
                     i += 1
-                
+
                 if (self.in_range(r1 + (sign[0] * i), c1 + (sign[1] * i)) and self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)).team != piece.team):
                     valid_moves.append([r1 + (sign[0] * i), c1 + (sign[1] * i)])
 
         if (piece.piece_type == 'K'):
             # Disallow moves that result in check
-            for row in range(r1-1, r1+1):
-                for col in range(c1-1, c1+1):
-                    if (self.in_range(row, col) and (self.get_piece(row, col) is None or self.get_piece(row, col).team != piece.team) and not self.position_in_check(r1, c1)): 
+            for row in range(r1 - 1, r1 + 2):
+                for col in range(c1 - 1, c1 + 2):
+                    if (self.in_range(row, col) and (self.get_piece(row, col) is None or self.get_piece(row, col).team != piece.team)):
                         valid_moves.append([row, col])
 
+        # TODO: filter out moves that lead to check
+        no_check_valid_moves = list(filter(lambda move : not self.results_in_check(r1, c1, move) , valid_moves))
         return valid_moves
 
-    def move_piece(self, r1, c1, r2, c2, team):
-        piece = self.get_piece(r1, c1)
-        valid_moves = self.compute_valid_moves(r1, c1, team)
-
-        if (len(list(filter(lambda move : move == [r2, c2], valid_moves))) == 0):
-            print("Invalid move")
-            return False
-            
-        destination = self.get_piece(r2, c2)
-
-        self.set_piece(r1, c1, None)
-        self.set_piece(r2, c2, piece)
-
-        if (destination is not None and destination.piece_type == 'K'):
-            print(piece.team + " wins!\n")
-
-        if (piece.piece_type == 'K'):
-            self.king_pos[self.colors.index(piece.team)] = [r2, c2]
-
-        piece.moved = True
-
-        return piece.moved
-        
     def display_board(self):
         print('\n')
         for i in range(self.rows):
@@ -211,16 +214,26 @@ class Board:
 if __name__ == "__main__":
     board = Board()
     board.setup_pieces()
-    move_count = 0
+    board.clear_board()
+    board.set_piece(1, 7, chess_piece.Piece('B', 'K'))
+    board.set_piece(1, 0, chess_piece.Piece('W', 'R'))
+    board.set_piece(2, 6, chess_piece.Piece('B', 'P'))
 
-    while(not board.check_checkmate(board.colors[move_count % 2])):
+    board.display_board()
+    # print(board.compute_valid_moves(1, 7, 'B'))
+    print(board.position_in_check('B'))
 
-        board.display_board()
-        print(board.colors[move_count % 2] + "'s move:")
-        r1, c1, r2, c2 = input("Enter coordinates of moves").split()
-        if (board.move_piece(int(r1), int(c1), int(r2), int(c2), board.colors[move_count % 2])):
-            move_count += 1
+    # move_count = 0
 
-    print(*board.compute_valid_moves(0, 2, 'B'))
-    print(board.check_checkmate('W'))
+    # while(not board.check_checkmate(board.colors[move_count % 2])):
+
+    #     board.display_board()
+    #     print(board.colors[move_count % 2] + "'s move:")
+    #     r1, c1, r2, c2 = input("Enter coordinates of moves").split()
+    #     if (board.move_piece(int(r1), int(c1), int(r2), int(c2), board.colors[move_count % 2])):
+    #         move_count += 1
+
+    # print(*board.compute_valid_moves(0, 2, 'B'))
+    print(board.check_checkmate('B'))
+    board.display_board()
     print('Done')
