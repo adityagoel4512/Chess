@@ -130,7 +130,7 @@ class Board:
                 if piece is not None and piece.team == king.team:
                     moves = self.compute_valid_moves(row, col, piece.team, False)
                     for move in moves:
-                        temp_state = self.__deepcopy__({})
+                        temp_state = self.__deepcopy__()
                         temp_state.move_piece(row, col, move[0], move[1], piece.team, False)
                         if not temp_state.position_in_check(side):
                             return False
@@ -138,7 +138,7 @@ class Board:
 
     def results_in_check(self, r1, c1, move, filter_check_moves):
         assert self.get_piece(r1, c1) is not None
-        temp_state = self.__deepcopy__({})
+        temp_state = self.__deepcopy__()
         temp_state.move_piece(r1, c1, move[0], move[1], temp_state.get_piece(r1, c1).team, filter_check_moves)
         return temp_state.position_in_check(self.get_piece(r1, c1).team)
 
@@ -239,7 +239,7 @@ class Board:
                 if piece is not None and piece.team == start_team:
                     valid_moves = self.compute_valid_moves(row, col, start_team, True)
                     for move in valid_moves:
-                        temp_state = self.__deepcopy__({})
+                        temp_state = self.__deepcopy__()
                         temp_state.move_piece(row, col, move[0], move[1], start_team, True)
                         if moves == 1:
                             game_boards.append(temp_state)
