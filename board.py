@@ -6,8 +6,14 @@ class Board:
     colors = ['W', 'B']
     pieces = ['P', 'R', 'H', 'B', 'Q', 'K']
 
-    def __init__(self, grid = None, king_pos = [[7, 4], [0, 4]]):
+    # TODO: start searching computerised player
+    # scores = []
+    # dead_pieces = []
+    # piece_value_map = map([...])
+
+    def __init__(self, grid = None, king_pos = [[7, 4], [0, 4]], move_count = 0):
         self.king_pos = king_pos
+        self.move_count = move_count
         if grid is None:
             for i in range(self.rows):
                 self.grid.append([])
@@ -28,7 +34,7 @@ class Board:
                     copy_grid[row].append([self.grid[row][col][0], None])
 
         copy_king_pos = list(map(lambda pos : [pos[0], pos[1]], self.king_pos))
-        return Board(copy_grid, copy_king_pos)
+        return Board(copy_grid, copy_king_pos, self.move_count)
 
     def clear_board(self):
         for row in self.grid:
@@ -37,7 +43,7 @@ class Board:
 
     def in_range(self, row, column):
         return row < self.rows and row >= 0 and column < self.rows and column >= 0
-    
+
     def get_piece(self, row, column):
         if not self.in_range(row, column):
             return None
@@ -65,6 +71,7 @@ class Board:
         if destination is not None and destination.piece_type == 'K':
             print(piece.team + " wins!\n")
 
+        self.move_count += 1
         piece.moved = True
 
         return piece.moved
@@ -108,7 +115,7 @@ class Board:
         return False
 
     def check_checkmate(self, side):
-        
+
         i = self.colors.index(side)
         r1 = self.king_pos[i][0]
         c1 = self.king_pos[i][1]
@@ -142,7 +149,7 @@ class Board:
 
         if piece is None or piece.team != team:
             return valid_moves
-        
+
         direction = 1 if piece.team == 'B' else -1
 
         if piece.piece_type == 'P':
@@ -173,9 +180,9 @@ class Board:
 
         if piece.piece_type == 'H':
             signs = [[1, 1], [1, -1], [-1, 1], [-1, -1]]
-            
+
             for sign in signs:
-                if self.in_range(r1 + (sign[0] * 1), c1 + (sign[1] * 2)) and (self.get_piece(r1 + 1, c1 + 2) is None or self.get_piece(r1 + 1, c1 + 2).team != piece.team):
+                if self.in_range(r1 + (sign[0] * 1), c1 + (sign[1] * 2)) and (self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)) is None or self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)).team != piece.team):
                     valid_moves.append([r1 + (sign[0] * 1), c1 + (sign[1] * 2)])
                 if self.in_range(r1 + (sign[0] * 2), c1 + (sign[1] * 1)) and (self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)) is None or self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)).team != piece.team):
                     valid_moves.append([r1 + (sign[0] * 2), c1 + (sign[1] * 1)])
@@ -206,6 +213,50 @@ class Board:
 
         return valid_moves
 
+    def evaluate_score(self, team, maximiser=True):
+        centipawn_piece_dict = {'P': 100, 'H': 350, 'B': 350, 'R': 525, 'Q': 1000, 'K': 10000}
+        material_balance = 0
+        positional_balance = 0
+        for row in range(self.rows):
+            for col in range(self.rows):
+                piece = self.get_piece(row, col)
+                if piece is None:
+                    print("NONE")
+                elif piece.team == team:
+                    material_balance += centipawn_piece_dict[piece.piece_type]
+                elif piece.team != team:
+                    material_balance -= centipawn_piece_dict[piece.piece_type]
+        total_balance = material_balance + positional_balance
+        return total_balance if maximiser else -total_balance
+
+    def search_game_tree(self, start_team, moves, game_boards):
+        if moves == 0:
+            return
+        opponent_team = self.colors[(self.colors.index(start_team) + 1) % len(self.colors)]
+        for row in range(self.rows):
+            for col in range(self.rows):
+                piece = self.get_piece(row, col)
+                if piece is not None and piece.team == start_team:
+                    valid_moves = self.compute_valid_moves(row, col, start_team, True)
+                    for move in valid_moves:
+                        temp_state = self.__deepcopy__({})
+                        temp_state.move_piece(row, col, move[0], move[1], start_team, True)
+                        if moves == 1:
+                            game_boards.append(temp_state)
+                        temp_state.search_game_tree(opponent_team, moves-1, game_boards)
+
+    def play_game(self, mode=0):
+
+        if mode == 0:
+            while not self.check_checkmate(board.colors[self.move_count % 2]):
+                self.display_board()
+                print(board.colors[self.move_count % 2] + "'s move:")
+                r1, c1, r2, c2 = input("Enter coordinates of moves").split()
+                self.move_piece(int(r1), int(c1), int(r2), int(c2), board.colors[self.move_count % 2], True)
+        else:
+            print('computer')
+            # implement computer play here
+
     def display_board(self):
         print('\n')
         for i in range(self.rows):
@@ -216,17 +267,12 @@ class Board:
 if __name__ == "__main__":
     board = Board()
     board.setup_pieces()
+    board.play_game()
+    # two_moves = []
+    # board.search_game_tree('W', 2, two_moves)
+    # print(len(two_moves))
 
-    move_count = 0
 
-    while not board.check_checkmate(board.colors[move_count % 2]):
 
-        board.display_board()
-        print(board.colors[move_count % 2] + "'s move:")
-        r1, c1, r2, c2 = input("Enter coordinates of moves").split()
-        print(board.get_piece(int(r1), int(c1)))
-        if board.move_piece(int(r1), int(c1), int(r2), int(c2), board.colors[move_count % 2], True):
-            move_count += 1
-
-    board.display_board()
+    # board.display_board()
     print('Done')
