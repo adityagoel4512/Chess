@@ -95,7 +95,6 @@ class Board:
         self.set_piece(self.rows - 1, 4, chess_piece.Piece('W', self.pieces[5]))
 
     def position_in_check(self, side):
-
         i = self.colors.index(side)
         r1 = self.king_pos[i][0]
         c1 = self.king_pos[i][1]
@@ -112,7 +111,6 @@ class Board:
         return False
 
     def check_checkmate(self, side):
-
         i = self.colors.index(side)
         r1 = self.king_pos[i][0]
         c1 = self.king_pos[i][1]
@@ -140,7 +138,6 @@ class Board:
         return temp_state.position_in_check(self.get_piece(r1, c1).team)
 
     def compute_valid_moves(self, r1, c1, team, filter_check_moves):
-
         piece = self.get_piece(r1, c1)
         valid_moves = []
 
