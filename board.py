@@ -59,6 +59,7 @@ class Board:
             print("Invalid move")
             return False
 
+
         destination = self.get_piece(r2, c2)
 
         self.set_piece(r1, c1, None)
@@ -125,17 +126,19 @@ class Board:
                 if piece is not None and piece.team == king.team:
                     moves = self.compute_valid_moves(row, col, piece.team, False)
                     for move in moves:
-                        temp_state = self.__deepcopy__()
-                        temp_state.move_piece(row, col, move[0], move[1], piece.team, False)
-                        if not temp_state.position_in_check(side):
-                            return False
+                        if self.move_piece(row, col, move[0], move[1], piece.team, False):
+                            if not self.position_in_check(side):
+                                return False
+                            moved_piece = self.get_piece(move[0], move[1])
+                            self.set_piece(row, col, moved_piece)
+                            self.set_piece(move[0], move[1], None)
         return True
 
     def results_in_check(self, r1, c1, move, filter_check_moves):
         assert self.get_piece(r1, c1) is not None
         temp_state = self.__deepcopy__()
         temp_state.move_piece(r1, c1, move[0], move[1], temp_state.get_piece(r1, c1).team, filter_check_moves)
-        return temp_state.position_in_check(self.get_piece(r1, c1).team)
+        return temp_state.in_range(move[0], move[1]) and temp_state.position_in_check(temp_state.get_piece(move[0], move[1]).team)
 
     def compute_valid_moves(self, r1, c1, team, filter_check_moves):
         piece = self.get_piece(r1, c1)
@@ -210,10 +213,9 @@ class Board:
                             self.get_piece(row, col) is None or self.get_piece(row, col).team != piece.team):
                         valid_moves.append([row, col])
 
-        # TODO: filter out moves that lead to check
         if filter_check_moves:
             valid_moves = list(
-                filter(lambda move: not self.results_in_check(r1, c1, move, not filter_check_moves), valid_moves))
+                filter(lambda move: self.in_range(move[0], move[1]) and not self.results_in_check(r1, c1, move, not filter_check_moves), valid_moves))
 
         return valid_moves
 
@@ -222,7 +224,6 @@ class Board:
         # TODO: Stage 1: material and pawn-king structure
         # TODO: Stage 2: dynamic piece-square tables
         # TODO: Stage 3: mobility and board control (no of available moves high is valuable)
-
         further_moves = []
         self.search_game_tree(team, 1, further_moves)
         mobility_score = len(further_moves) * 2
@@ -271,7 +272,7 @@ class Board:
                             game_boards.append(temp_state)
                         temp_state.search_game_tree(opponent_team, moves - 1, game_boards)
 
-    def minimax(self, depth, team, maximiser):
+    def minimax(self, depth, team, maximiser, alpha=float('-inf'), beta=float('inf')):
         opposition_team = self.colors[(self.colors.index(team)+1)%2]
         if depth == 0 or self.check_checkmate(team):
             return self
@@ -281,11 +282,14 @@ class Board:
             max_board = None
             self.search_game_tree(team, 1, boards)
             for board in boards:
-                minimax_board = board.minimax(depth-1, opposition_team, False)
+                minimax_board = board.minimax(depth-1, opposition_team, False, alpha, beta)
                 board_score = minimax_board.evaluate_score(team)
                 if board_score > max_value:
                     max_value = board_score
                     max_board = board
+                alpha = max(alpha, max_value)
+                if beta <= alpha:
+                    break
             return max_board
         if not maximiser:
             min_value = float('-inf')
@@ -293,11 +297,14 @@ class Board:
             min_board = None
             self.search_game_tree(team, 1, boards)
             for board in boards:
-                minimax_board = board.minimax(depth-1, opposition_team, True)
+                minimax_board = board.minimax(depth-1, opposition_team, True, alpha, beta)
                 board_score = minimax_board.evaluate_score(team)
                 if board_score > min_value:
                     min_value = board_score
                     min_board = minimax_board
+                beta = min(beta, min_value)
+                if beta <= alpha:
+                    break
             return min_board
 
     def play_game(self, mode=0):
@@ -323,9 +330,10 @@ if __name__ == "__main__":
     board = Board()
     board.setup_pieces()
     # board.play_game()
-    for i in range(16):
-        board = board.minimax(2, board.colors[i%2], True)
+    for i in range(64):
+        board = board.minimax(3, board.colors[i%2], True)
         board.display_board()
+        print(board.colors[(i)%2] + "'s move. The " + str(i+1) + "th move.")
 
 
     print('Done')
