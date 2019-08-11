@@ -56,11 +56,11 @@ class Board:
         valid_moves = self.compute_valid_moves(r1, c1, team, filter_check_moves)
 
         if len(list(filter(lambda move: move == [r2, c2], valid_moves))) == 0:
-            print("Invalid move")
+            # print("Invalid move")
             return False
 
 
-        destination = self.get_piece(r2, c2)
+        # destination = self.get_piece(r2, c2)
 
         self.set_piece(r1, c1, None)
         self.set_piece(r2, c2, piece)
@@ -137,8 +137,9 @@ class Board:
     def results_in_check(self, r1, c1, move, filter_check_moves):
         assert self.get_piece(r1, c1) is not None
         temp_state = self.__deepcopy__()
-        temp_state.move_piece(r1, c1, move[0], move[1], temp_state.get_piece(r1, c1).team, filter_check_moves)
-        return temp_state.in_range(move[0], move[1]) and temp_state.position_in_check(temp_state.get_piece(move[0], move[1]).team)
+        team = self.get_piece(r1, c1).team
+        temp_state.move_piece(r1, c1, move[0], move[1], team, filter_check_moves)
+        return temp_state.in_range(move[0], move[1]) and temp_state.position_in_check(team)
 
     def compute_valid_moves(self, r1, c1, team, filter_check_moves):
         piece = self.get_piece(r1, c1)
@@ -245,11 +246,15 @@ class Board:
                     positional_balance += tables.centipawn_position_dict[piece.piece_type][color_based_access[0][0]][color_based_access[0][1]]
                     if piece.piece_type == 'B':
                         bishop_count += 1
+                    if row > 1 and row < 6 and col > 1 and col < 6:
+                        positional_balance += 15
                 elif piece.team != team:
                     material_balance -= tables.centipawn_piece_dict[piece.piece_type]
                     positional_balance -= tables.centipawn_position_dict[piece.piece_type][color_based_access[1][0]][color_based_access[1][1]]
                     if piece.piece_type == 'B':
                         bishop_count -= 1
+                    if row > 1 and row < 6 and col > 1 and col < 6:
+                        positional_balance -= 15
 
         if bishop_count == 2 or bishop_count == -2:
             material_balance += (bishop_count * 25)
@@ -273,16 +278,16 @@ class Board:
                         temp_state.search_game_tree(opponent_team, moves - 1, game_boards)
 
     def minimax(self, depth, team, maximiser, alpha=float('-inf'), beta=float('inf')):
-        opposition_team = self.colors[(self.colors.index(team)+1)%2]
         if depth == 0 or self.check_checkmate(team):
             return self
+        opposition_team = self.colors[(self.colors.index(team)+1)%2]
+        boards = []
+        self.search_game_tree(team, 1, boards)
         if maximiser:
             max_value = float('-inf')
-            boards = []
             max_board = None
-            self.search_game_tree(team, 1, boards)
             for board in boards:
-                minimax_board = board.minimax(depth-1, opposition_team, False, alpha, beta)
+                minimax_board = board.minimax(depth-1, opposition_team, not maximiser, alpha, beta)
                 board_score = minimax_board.evaluate_score(team)
                 if board_score > max_value:
                     max_value = board_score
@@ -291,13 +296,11 @@ class Board:
                 if beta <= alpha:
                     break
             return max_board
-        if not maximiser:
+        else:
             min_value = float('-inf')
-            boards = []
             min_board = None
-            self.search_game_tree(team, 1, boards)
             for board in boards:
-                minimax_board = board.minimax(depth-1, opposition_team, True, alpha, beta)
+                minimax_board = board.minimax(depth-1, opposition_team, not maximiser, alpha, beta)
                 board_score = minimax_board.evaluate_score(team)
                 if board_score > min_value:
                     min_value = board_score
@@ -333,7 +336,7 @@ if __name__ == "__main__":
     for i in range(64):
         board = board.minimax(3, board.colors[i%2], True)
         board.display_board()
-        print(board.colors[(i)%2] + "'s move. The " + str(i+1) + "th move.")
+        print(board.colors[(i)%2] + "'s move. Move " + str(i+1) + ".")
 
 
     print('Done')
