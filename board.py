@@ -83,9 +83,21 @@ class Board:
             self.set_piece(r1, self.rows-1, None)
             self.set_piece(r1, c2-1, rook)
         elif c2 - c1 == -2 and piece.piece_type == 'K':
+            # Queen Side Castle
             rook = self.get_piece(r1, 0)
             self.set_piece(r1, 0, None)
             self.set_piece(r1, c2+1, rook)
+        elif (r2 == self.rows or r2 == 0) and piece.piece_type == 'P':
+            # Promotion
+            self.dead_pieces[team].append(piece)
+            print("Promotion Time: ")
+            print(self.dead_pieces[team])
+            revive_piece_text = input("Enter display text as desired for piece to reintroduce")
+            dead_pieces_display_texts = map(lambda p : p.display_text, self.dead_pieces[team])
+            while revive_piece_text not in dead_pieces_display_texts:
+                revive_piece_text = input("Enter valid display text as desired for piece to reintroduce")
+            promotion_piece = filter(lambda p : p.display_text == revive_piece_text, self.dead_pieces[team])[0]
+            self.set_piece(r2, c2, promotion_piece)
 
         self.move_count += 1
         piece.moved = True
