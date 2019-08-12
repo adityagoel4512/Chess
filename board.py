@@ -3,6 +3,8 @@ import piece_square_tables as tables
 import chess
 import chess.svg
 
+# TODO: support for drawing games
+
 class Board:
     grid = []
     rows = 8
@@ -10,12 +12,13 @@ class Board:
     pieces = ['P', 'R', 'N', 'B', 'Q', 'K']
 
 
-    def __init__(self, grid=None, king_pos=[[7, 4], [0, 4]], move_count=0, castling = {'W': [False, False], 'B': [False, False]}, dead_pieces = {'W': [], 'B': []}):
+    def __init__(self, grid=None, king_pos=[[7, 4], [0, 4]], move_count=0, castling = {'W': [False, False], 'B': [False, False]}, dead_pieces = {'W': [], 'B': []}, fifty_move_count = 0):
         self.king_pos = king_pos
         self.move_count = move_count
         # King side 2nd element, Queen side 1st element.
         self.castling = castling
         self.dead_pieces = dead_pieces
+        self.fifty_move_count = fifty_move_count
         if grid is None:
             for i in range(self.rows):
                 self.grid.append([])
@@ -38,7 +41,7 @@ class Board:
         copy_king_pos = list(map(lambda pos: [pos[0], pos[1]], self.king_pos))
         copy_castling = {'W': list(map(lambda castle: castle, self.castling['W'])), 'B': list(map(lambda castle: castle, self.castling['B']))}
         copy_dead_pieces = {'W': list(map(lambda piece: piece.__copy__(), self.dead_pieces['W'])), 'B': list(map(lambda piece: piece.__copy__(), self.dead_pieces['B']))}
-        return Board(copy_grid, copy_king_pos, self.move_count, copy_castling, copy_dead_pieces)
+        return Board(copy_grid, copy_king_pos, self.move_count, copy_castling, copy_dead_pieces, self.fifty_move_count)
 
     def clear_board(self):
         for row in self.grid:
@@ -62,17 +65,18 @@ class Board:
     def move_piece(self, r1, c1, r2, c2, team, filter_check_moves):
         piece = self.get_piece(r1, c1)
         valid_moves = self.compute_valid_moves(r1, c1, team, filter_check_moves)
+        self.fifty_move_count += 1
 
         if len(list(filter(lambda move: move == [r2, c2], valid_moves))) == 0:
             # print("Invalid move")
             return False
-
 
         destination = self.get_piece(r2, c2)
 
         # No valid moves replace a piece with its own team member
         if destination is not None:
             self.dead_pieces[destination.team].append(destination)
+            self.fifty_move_count = 0
 
         self.set_piece(r1, c1, None)
         self.set_piece(r2, c2, piece)
@@ -87,17 +91,24 @@ class Board:
             rook = self.get_piece(r1, 0)
             self.set_piece(r1, 0, None)
             self.set_piece(r1, c2+1, rook)
-        elif (r2 == self.rows or r2 == 0) and piece.piece_type == 'P':
-            # Promotion
-            self.dead_pieces[team].append(piece)
-            print("Promotion Time: ")
-            print(self.dead_pieces[team])
-            revive_piece_text = input("Enter display text as desired for piece to reintroduce")
-            dead_pieces_display_texts = map(lambda p : p.display_text, self.dead_pieces[team])
-            while revive_piece_text not in dead_pieces_display_texts:
-                revive_piece_text = input("Enter valid display text as desired for piece to reintroduce")
-            promotion_piece = filter(lambda p : p.display_text == revive_piece_text, self.dead_pieces[team])[0]
-            self.set_piece(r2, c2, promotion_piece)
+        if piece.piece_type == 'P':
+            self.fifty_move_count = 0
+            if r2 == self.rows or r2 == 0:
+                # Promotion
+                # TODO: pawn promotion as part of minimax not automatically choose highest value piece
+                # self.dead_pieces[team].append(piece)
+                # print("Promotion Time: ")
+                # print(self.dead_pieces[team])
+                # revive_piece_text = input("Enter display text as desired for piece to reintroduce")
+                # dead_pieces_display_texts = map(lambda p : p.display_text, self.dead_pieces[team])
+                # while revive_piece_text not in dead_pieces_display_texts:
+                #     revive_piece_text = input("Enter valid display text as desired for piece to reintroduce")
+                # promotion_piece = filter(lambda p : p.display_text == revive_piece_text, self.dead_pieces[team])[0]
+                # self.set_piece(r2, c2, promotion_piece)
+
+                self.dead_pieces[team].append(piece)
+                promotion_piece = self.dead_pieces[team].sort(reverse=True, key=(lambda p : tables.centipawn_piece_dict[p.piece_type]))[0]
+                self.set_piece(r2, c2, promotion_piece)
 
         self.move_count += 1
         piece.moved = True
@@ -307,6 +318,7 @@ class Board:
         # TODO: Stage 1: material and pawn-king structure
         # TODO: Stage 2: dynamic piece-square tables
         # TODO: Stage 3: mobility and board control (no of available moves high is valuable)
+
         further_moves = []
         self.search_game_tree(team, 1, further_moves)
         mobility_score = len(further_moves) * 2
@@ -470,8 +482,13 @@ if __name__ == "__main__":
     board.setup_pieces()
 
     i = 0
-    while not board.check_checkmate(board.colors[i%2]):
+    while not board.check_checkmate(board.colors[i%2]) and board.fifty_move_count < 50:
         next_board = board.minimax(2, board.colors[i%2], True)
+
+        if next_board is None:
+            print('Stalemate')
+            break
+
         # next_board.display_board()
         next_board.update_board_svg()
         # print(next_board.evaluate_score(board.colors[i%2]))
@@ -481,4 +498,5 @@ if __name__ == "__main__":
         board = next_board
         i += 1
 
+    print(board.colors[(i+1)%2] + " wins!")
     print('Done')
