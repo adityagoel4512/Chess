@@ -1,11 +1,13 @@
 import piece as chess_piece
 import piece_square_tables as tables
+import chess
+import chess.svg
 
 class Board:
     grid = []
     rows = 8
     colors = ['W', 'B']
-    pieces = ['P', 'R', 'H', 'B', 'Q', 'K']
+    pieces = ['P', 'R', 'N', 'B', 'Q', 'K']
 
 
     def __init__(self, grid=None, king_pos=[[7, 4], [0, 4]], move_count=0, castling = {'W': [False, False], 'B': [False, False]}, dead_pieces = {'W': [], 'B': []}):
@@ -95,7 +97,7 @@ class Board:
             self.set_piece(6, i, chess_piece.Piece('W', 'P', i))
             self.set_piece(1, i, chess_piece.Piece('B', 'P', i))
 
-        # Rooks, Horses, Bishops
+        # Rooks, Knights, Bishops
         i = 0
         while i < 3:
             self.set_piece(0, i, chess_piece.Piece('B', self.pieces[i + 1], i))
@@ -134,13 +136,9 @@ class Board:
         for row in range(self.rows):
             for col in range(self.rows):
                 temp_piece = self.get_piece(row, col)
-                # print(temp_piece, king_piece)
                 if temp_piece is not None and temp_piece.team != king_piece.team:
                     if len(list(filter(lambda pos: pos == [r1, c1], self.compute_valid_moves(row, col, temp_piece.team, False)))) > 0:
                         # print('check')
-                        # print(king_piece)
-                        # print(self.king_pos)
-                        # self.display_board()
                         return True
 
         return False
@@ -225,7 +223,7 @@ class Board:
                         sign[1] * i)).team != piece.team:
                     valid_moves.append([r1 + (sign[0] * i), c1 + (sign[1] * i)])
 
-        if piece.piece_type == 'H':
+        if piece.piece_type == 'N':
             signs = [[1, 1], [1, -1], [-1, 1], [-1, -1]]
 
             for sign in signs:
@@ -393,12 +391,50 @@ class Board:
             print('computer')
             # implement computer play here
 
+    def display_dead_pieces(self):
+        print(list(map(lambda piece : piece.display_text, self.dead_pieces['W'])))
+        print(list(map(lambda piece : piece.display_text, self.dead_pieces['B'])))
+
     def display_board(self):
         print('\n')
         for i in range(self.rows):
             row = map(lambda pos: pos if pos[1] is None else [pos[0], pos[1].display_text], self.grid[i])
             print(*row)
         print('\n')
+
+    def export_board_string(self):
+        board_string = ""
+        for row in range(self.rows):
+            empty_count = 0
+            for col in range(self.rows):
+                piece = self.get_piece(row, col)
+                if piece is None:
+                    empty_count += 1
+                elif piece.team == 'B':
+                    if empty_count != 0:
+                        board_string += str(empty_count)
+                        empty_count = 0
+                    board_string += piece.piece_type.lower()
+                else:
+                    if empty_count != 0:
+                        board_string += str(empty_count)
+                        empty_count = 0
+                    board_string += piece.piece_type
+
+                if col == self.rows-1 and empty_count != 0:
+                    board_string += str(empty_count)
+                    empty_count = 0
+            if row < self.rows-1:
+                board_string += "/"
+
+        return board_string
+
+    def update_board_svg(self):
+        board = chess.Board(self.export_board_string())
+        svg_text = chess.svg.board(board)
+        svg_file = open("board.svg", "w")
+        svg_file.write(svg_text)
+        svg_file.close()
 
 def differences_between_boards(b1, b2):
     differences = []
@@ -424,12 +460,13 @@ if __name__ == "__main__":
     i = 0
     while not board.check_checkmate(board.colors[i%2]):
         next_board = board.minimax(2, board.colors[i%2], True)
-        next_board.display_board()
+        # next_board.display_board()
+        next_board.update_board_svg()
         # print(next_board.evaluate_score(board.colors[i%2]))
-        print(differences_between_boards(board, next_board))
+        # print(differences_between_boards(board, next_board))
+        next_board.display_dead_pieces()
         print(board.colors[(i)%2] + "'s move. Move " + str(i+1) + ".")
         board = next_board
         i += 1
-
 
     print('Done')
