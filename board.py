@@ -65,8 +65,15 @@ class Board:
         self.set_piece(r1, c1, None)
         self.set_piece(r2, c2, piece)
 
-        # if destination is not None and destination.piece_type == 'K':
-        #     print(piece.team + " wins!\n")
+        if c2 - c1 == 2 and piece.piece_type == 'K':
+            # King Side Castle
+            rook = self.get_piece(r1, self.rows-1)
+            self.set_piece(r1, self.rows-1, None)
+            self.set_piece(r1, c2-1, rook)
+        elif c2 - c1 == -2 and piece.piece_type == 'K':
+            rook = self.get_piece(r1, 0)
+            self.set_piece(r1, 0, None)
+            self.set_piece(r1, c2+1, rook)
 
         self.move_count += 1
         piece.moved = True
@@ -75,25 +82,34 @@ class Board:
 
     def setup_pieces(self):
         for i in range(self.rows):
-            self.set_piece(6, i, chess_piece.Piece('W', 'P'))
-            self.set_piece(1, i, chess_piece.Piece('B', 'P'))
+            self.set_piece(6, i, chess_piece.Piece('W', 'P', i))
+            self.set_piece(1, i, chess_piece.Piece('B', 'P', i))
 
         # Rooks, Horses, Bishops
         i = 0
         while i < 3:
-            self.set_piece(0, i, chess_piece.Piece('B', self.pieces[i + 1]))
-            self.set_piece(0, self.rows - (i + 1), chess_piece.Piece('B', self.pieces[i + 1]))
-            self.set_piece(self.rows - 1, i, chess_piece.Piece('W', self.pieces[i + 1]))
-            self.set_piece(self.rows - 1, self.rows - (i + 1), chess_piece.Piece('W', self.pieces[i + 1]))
+            self.set_piece(0, i, chess_piece.Piece('B', self.pieces[i + 1], i))
+            self.set_piece(0, self.rows - (i + 1), chess_piece.Piece('B', self.pieces[i + 1], i+4))
+            self.set_piece(self.rows - 1, i, chess_piece.Piece('W', self.pieces[i + 1], i))
+            self.set_piece(self.rows - 1, self.rows - (i + 1), chess_piece.Piece('W', self.pieces[i + 1], i+4))
             i += 1
 
         # Queen
-        self.set_piece(0, 3, chess_piece.Piece('B', self.pieces[4]))
-        self.set_piece(self.rows - 1, 3, chess_piece.Piece('W', self.pieces[4]))
+        self.set_piece(0, 3, chess_piece.Piece('B', self.pieces[4], 1))
+        self.set_piece(self.rows - 1, 3, chess_piece.Piece('W', self.pieces[4], 0))
 
         # King
-        self.set_piece(0, 4, chess_piece.Piece('B', self.pieces[5]))
-        self.set_piece(self.rows - 1, 4, chess_piece.Piece('W', self.pieces[5]))
+        self.set_piece(0, 4, chess_piece.Piece('B', self.pieces[5], 1))
+        self.set_piece(self.rows - 1, 4, chess_piece.Piece('W', self.pieces[5], 0))
+
+    def locate_piece(self, piece):
+        assert piece is not None
+        for row in range(self.rows):
+            for col in range(self.rows):
+                square = self.get_piece(row, col)
+                if square is not None and piece.id == square.id and square.display_text == piece.display_text:
+                    return [row, col]
+        return [-1, -1]
 
     def position_in_check(self, side):
         i = self.colors.index(side)
@@ -101,12 +117,20 @@ class Board:
         c1 = self.king_pos[i][1]
 
         king_piece = self.get_piece(r1, c1)
+
+        if king_piece is None:
+            return True
+
         for row in range(self.rows):
             for col in range(self.rows):
                 temp_piece = self.get_piece(row, col)
+                # print(temp_piece, king_piece)
                 if temp_piece is not None and temp_piece.team != king_piece.team:
-                    if len(list(filter(lambda pos: pos == [r1, c1],
-                                       self.compute_valid_moves(row, col, temp_piece.team, False)))) > 0:
+                    if len(list(filter(lambda pos: pos == [r1, c1], self.compute_valid_moves(row, col, temp_piece.team, False)))) > 0:
+                        # print('check')
+                        # print(king_piece)
+                        # print(self.king_pos)
+                        # self.display_board()
                         return True
 
         return False
@@ -117,6 +141,8 @@ class Board:
         c1 = self.king_pos[i][1]
 
         king = self.get_piece(r1, c1)
+        if king is None:
+            return True
 
         if not self.position_in_check(side):
             return False
@@ -135,11 +161,11 @@ class Board:
         return True
 
     def results_in_check(self, r1, c1, move, filter_check_moves):
-        assert self.get_piece(r1, c1) is not None
+        piece = self.get_piece(r1, c1)
+        assert piece is not None
         temp_state = self.__deepcopy__()
-        team = self.get_piece(r1, c1).team
-        temp_state.move_piece(r1, c1, move[0], move[1], team, filter_check_moves)
-        return temp_state.in_range(move[0], move[1]) and temp_state.position_in_check(team)
+        temp_state.move_piece(r1, c1, move[0], move[1], piece.team, filter_check_moves)
+        return temp_state.in_range(move[0], move[1]) and temp_state.position_in_check(piece.team)
 
     def compute_valid_moves(self, r1, c1, team, filter_check_moves):
         piece = self.get_piece(r1, c1)
@@ -210,9 +236,30 @@ class Board:
             # Disallow moves that result in check
             for row in range(r1 - 1, r1 + 2):
                 for col in range(c1 - 1, c1 + 2):
-                    if self.in_range(row, col) and (
-                            self.get_piece(row, col) is None or self.get_piece(row, col).team != piece.team):
+                    if self.in_range(row, col) and (self.get_piece(row, col) is None
+                                                    or self.get_piece(row, col).team != piece.team):
                         valid_moves.append([row, col])
+
+            # Castling
+            castling = [True, True]
+            if not piece.moved:
+                # Right side for white piece
+                for col in range(c1+1, self.rows-1):
+                    if self.get_piece(r1, col) is not None:
+                        castling[1] = False
+                far_right_piece = self.get_piece(r1, self.rows-1)
+                castling[1] = castling[1] and far_right_piece is not None and far_right_piece.piece_type == 'R' and far_right_piece.team == team and not far_right_piece.moved
+                # Left side for white piece
+                for col in range(1, c1):
+                    if self.get_piece(r1, col) is not None:
+                        castling[0] = False
+                far_left_piece = self.get_piece(r1, 0)
+                castling[0] = castling[0] and far_left_piece is not None and far_left_piece.piece_type == 'R' and far_left_piece.team == team and not far_left_piece.moved
+
+                if castling[1]:
+                    valid_moves.append([r1, c1+2])
+                if castling[0]:
+                    valid_moves.append([r1, c1-2])
 
         if filter_check_moves:
             valid_moves = list(
@@ -278,9 +325,9 @@ class Board:
                         temp_state.search_game_tree(opponent_team, moves - 1, game_boards)
 
     def minimax(self, depth, team, maximiser, alpha=float('-inf'), beta=float('inf')):
-        if depth == 0 or self.check_checkmate(team):
-            return self
         opposition_team = self.colors[(self.colors.index(team)+1)%2]
+        if depth == 0 or self.check_checkmate(team) or self.check_checkmate(opposition_team):
+            return self
         boards = []
         self.search_game_tree(team, 1, boards)
         if maximiser:
@@ -328,15 +375,36 @@ class Board:
             print(*row)
         print('\n')
 
+def differences_between_boards(b1, b2):
+    differences = []
+    for row in range(b2.rows):
+        for col in range(b2.rows):
+            piece2 = b2.get_piece(row, col)
+            piece1 = b1.get_piece(row, col)
+            if piece1 is not None and piece2 is None:
+                #  moved from row, col to somewhere
+                dest = b2.locate_piece(piece1)
+                differences.append([(row, col), (dest[0], dest[1])])
+            elif piece1 is not None and piece2 is not None and piece1.display_text != piece2.display_text:
+                src = b1.locate_piece(piece2)
+                differences.append(['X', (src[0], src[1]), (row, col)])
+
+    return differences
+
 
 if __name__ == "__main__":
     board = Board()
     board.setup_pieces()
-    # board.play_game()
-    for i in range(64):
-        board = board.minimax(3, board.colors[i%2], True)
-        board.display_board()
+
+    i = 0
+    while not board.check_checkmate(board.colors[i%2]):
+        next_board = board.minimax(2, board.colors[i%2], True)
+        next_board.display_board()
+        # print(next_board.evaluate_score(board.colors[i%2]))
+        print(differences_between_boards(board, next_board))
         print(board.colors[(i)%2] + "'s move. Move " + str(i+1) + ".")
+        board = next_board
+        i += 1
 
 
     print('Done')
