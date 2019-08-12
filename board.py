@@ -7,9 +7,13 @@ class Board:
     colors = ['W', 'B']
     pieces = ['P', 'R', 'H', 'B', 'Q', 'K']
 
-    def __init__(self, grid=None, king_pos=[[7, 4], [0, 4]], move_count=0):
+
+    def __init__(self, grid=None, king_pos=[[7, 4], [0, 4]], move_count=0, castling = {'W': [False, False], 'B': [False, False]}, dead_pieces = {'W': [], 'B': []}):
         self.king_pos = king_pos
         self.move_count = move_count
+        # King side 2nd element, Queen side 1st element.
+        self.castling = castling
+        self.dead_pieces = dead_pieces
         if grid is None:
             for i in range(self.rows):
                 self.grid.append([])
@@ -30,7 +34,9 @@ class Board:
                     copy_grid[row].append([self.grid[row][col][0], None])
 
         copy_king_pos = list(map(lambda pos: [pos[0], pos[1]], self.king_pos))
-        return Board(copy_grid, copy_king_pos, self.move_count)
+        copy_castling = {'W': list(map(lambda castle: castle, self.castling['W'])), 'B': list(map(lambda castle: castle, self.castling['B']))}
+        copy_dead_pieces = {'W': list(map(lambda piece: piece.__copy__(), self.dead_pieces['W'])), 'B': list(map(lambda piece: piece.__copy__(), self.dead_pieces['B']))}
+        return Board(copy_grid, copy_king_pos, self.move_count, copy_castling, copy_dead_pieces)
 
     def clear_board(self):
         for row in self.grid:
@@ -60,7 +66,11 @@ class Board:
             return False
 
 
-        # destination = self.get_piece(r2, c2)
+        destination = self.get_piece(r2, c2)
+
+        # No valid moves replace a piece with its own team member
+        if destination is not None:
+            self.dead_pieces[destination.team].append(destination)
 
         self.set_piece(r1, c1, None)
         self.set_piece(r2, c2, piece)
@@ -165,6 +175,17 @@ class Board:
         assert piece is not None
         temp_state = self.__deepcopy__()
         temp_state.move_piece(r1, c1, move[0], move[1], piece.team, filter_check_moves)
+
+        # Checking for check post castling
+        if piece.piece_type == 'K':
+            if move[1] - c1 == 2:
+                # King side
+                temp_state.set_piece(r1, c1-1, temp_state.get_piece(r1, self.rows-1))
+                temp_state.set_piece(r1, self.rows-1, None)
+            elif move[1] - c1 == 2:
+                # Queen side
+                temp_state.set_piece(r1, c1+1, temp_state.get_piece(r1, 0))
+                temp_state.set_piece(r1, 0, None)
         return temp_state.in_range(move[0], move[1]) and temp_state.position_in_check(piece.team)
 
     def compute_valid_moves(self, r1, c1, team, filter_check_moves):
@@ -241,24 +262,28 @@ class Board:
                         valid_moves.append([row, col])
 
             # Castling
-            castling = [True, True]
-            if not piece.moved:
-                # Right side for white piece
+
+            if piece.moved:
+                self.castling[team] = [True, True]
+            else:
+                # King side
                 for col in range(c1+1, self.rows-1):
                     if self.get_piece(r1, col) is not None:
-                        castling[1] = False
+                        self.castling[team][1] = False
+                        pass
                 far_right_piece = self.get_piece(r1, self.rows-1)
-                castling[1] = castling[1] and far_right_piece is not None and far_right_piece.piece_type == 'R' and far_right_piece.team == team and not far_right_piece.moved
-                # Left side for white piece
+                self.castling[team][1] = self.castling[team][1] and far_right_piece is not None and far_right_piece.piece_type == 'R' and far_right_piece.team == team and not far_right_piece.moved
+                # Queen side
                 for col in range(1, c1):
                     if self.get_piece(r1, col) is not None:
-                        castling[0] = False
+                        self.castling[team][0] = False
+                        pass
                 far_left_piece = self.get_piece(r1, 0)
-                castling[0] = castling[0] and far_left_piece is not None and far_left_piece.piece_type == 'R' and far_left_piece.team == team and not far_left_piece.moved
+                self.castling[team][0] = self.castling[team][0] and far_left_piece is not None and far_left_piece.piece_type == 'R' and far_left_piece.team == team and not far_left_piece.moved
 
-                if castling[1]:
+                if self.castling[team][1]:
                     valid_moves.append([r1, c1+2])
-                if castling[0]:
+                if self.castling[team][0]:
                     valid_moves.append([r1, c1-2])
 
         if filter_check_moves:
