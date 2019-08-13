@@ -41,7 +41,8 @@ class Board:
         copy_king_pos = list(map(lambda pos: [pos[0], pos[1]], self.king_pos))
         copy_castling = {'W': list(map(lambda castle: castle, self.castling['W'])), 'B': list(map(lambda castle: castle, self.castling['B']))}
         copy_dead_pieces = {'W': list(map(lambda piece: piece.__copy__(), self.dead_pieces['W'])), 'B': list(map(lambda piece: piece.__copy__(), self.dead_pieces['B']))}
-        return Board(copy_grid, copy_king_pos, self.move_count, copy_castling, copy_dead_pieces, self.fifty_move_count)
+        copy_fifty_move_count = self.fifty_move_count
+        return Board(copy_grid, copy_king_pos, self.move_count, copy_castling, copy_dead_pieces, copy_fifty_move_count)
 
     def clear_board(self):
         for row in self.grid:
@@ -65,12 +66,12 @@ class Board:
     def move_piece(self, r1, c1, r2, c2, team, filter_check_moves):
         piece = self.get_piece(r1, c1)
         valid_moves = self.compute_valid_moves(r1, c1, team, filter_check_moves)
-        self.fifty_move_count += 1
 
-        if len(list(filter(lambda move: move == [r2, c2], valid_moves))) == 0:
+        if not filter(lambda move: move == [r2, c2], valid_moves):
             # print("Invalid move")
             return False
 
+        self.fifty_move_count += 1
         destination = self.get_piece(r2, c2)
 
         # No valid moves replace a piece with its own team member
@@ -107,8 +108,8 @@ class Board:
                 # self.set_piece(r2, c2, promotion_piece)
 
                 self.dead_pieces[team].append(piece)
-                promotion_piece = self.dead_pieces[team].sort(reverse=True, key=(lambda p : tables.centipawn_piece_dict[p.piece_type]))[0]
-                self.set_piece(r2, c2, promotion_piece)
+                self.dead_pieces[team].sort(reverse=True, key=lambda p: tables.centipawn_piece_dict[p.piece_type])
+                self.set_piece(r2, c2, self.dead_pieces[team][0])
 
         self.move_count += 1
         piece.moved = True
@@ -160,7 +161,7 @@ class Board:
             for col in range(self.rows):
                 temp_piece = self.get_piece(row, col)
                 if temp_piece is not None and temp_piece.team != king_piece.team:
-                    if len(list(filter(lambda pos: pos == [r1, c1], self.compute_valid_moves(row, col, temp_piece.team, False)))) > 0:
+                    if list(filter(lambda pos: pos == [r1, c1], self.compute_valid_moves(row, col, temp_piece.team, False))):
                         # print('check')
                         return True
 
@@ -480,6 +481,7 @@ def differences_between_boards(b1, b2):
 if __name__ == "__main__":
     board = Board()
     board.setup_pieces()
+    board.update_board_svg()
 
     i = 0
     while not board.check_checkmate(board.colors[i%2]) and board.fifty_move_count < 50:
@@ -498,5 +500,9 @@ if __name__ == "__main__":
         board = next_board
         i += 1
 
-    print(board.colors[(i+1)%2] + " wins!")
+    if board.fifty_move_count >= 50:
+        print('Draw by 50 move rule')
+    else:
+        print(board.colors[(i+1)%2] + " wins!")
+
     print('Done')
