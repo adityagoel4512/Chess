@@ -267,19 +267,21 @@ class Board:
 
             for sign in signs:
                 if self.in_range(r1 + (sign[0] * 1), c1 + (sign[1] * 2)):
-                    if self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)) is None or self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)).team != piece.team:
+                    if self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)) is None:
                         valid_moves.append([r1 + (sign[0] * 1), c1 + (sign[1] * 2)])
-                        # self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)).attacked_by.append([r1, c1])
+                    elif self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)).team != piece.team:
+                        valid_moves.append([r1 + (sign[0] * 1), c1 + (sign[1] * 2)])
+                        self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)).attacked_by.append([r1, c1])
                     else:
-                        pass
-                        # self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)).defended_by.append([r1, c1])
+                        self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)).defended_by.append([r1, c1])
                 if self.in_range(r1 + (sign[0] * 2), c1 + (sign[1] * 1)):
-                    if self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)) is None or self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)).team != piece.team:
+                    if self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)) is None:
                         valid_moves.append([r1 + (sign[0] * 2), c1 + (sign[1] * 1)])
-                        # self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)).attacked_by.append([r1, c1])
+                    elif self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)).team != piece.team:
+                        valid_moves.append([r1 + (sign[0] * 2), c1 + (sign[1] * 1)])
+                        self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)).attacked_by.append([r1, c1])
                     else:
-                        pass
-                        # self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)).defended_by.append([r1, c1])
+                        self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)).defended_by.append([r1, c1])
 
         if piece.piece_type == 'B' or piece.piece_type == 'Q':
             signs = [[1, 1], [1, -1], [-1, 1], [-1, -1]]
@@ -295,7 +297,6 @@ class Board:
                         valid_moves.append([r1 + (sign[0] * i), c1 + (sign[1] * i)])
                         self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)).attacked_by.append([r1, c1])
                     else:
-                        # pass
                         self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)).defended_by.append([r1, c1])
 
         if piece.piece_type == 'K':
@@ -342,7 +343,7 @@ class Board:
         # Stage 3: mobility and board control (no of available moves high is valuable)
 
         # TODO: Passed pawns, King Safety and Pawn Structure.
-        # TODO: defended pawns, pawn rams, pawn levers, duo trio quart
+        # TODO: pawn rams, pawn levers, duo trio quart
 
         further_moves = []
         self.search_game_tree(team, 1, further_moves)
