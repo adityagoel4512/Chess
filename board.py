@@ -3,13 +3,16 @@ import piece_square_tables as tables
 import chess
 import chess.svg
 
+
 class Board:
     grid = []
     rows = 8
     colors = ['W', 'B']
     pieces = ['P', 'R', 'N', 'B', 'Q', 'K']
 
-    def __init__(self, grid=None, king_pos=[[7, 4], [0, 4]], move_count=0, can_castle = {'W': [False, False], 'B': [False, False]}, dead_pieces = {'W': [], 'B': []}, fifty_move_count = 0):
+    def __init__(self, grid=None, king_pos=[[7, 4], [0, 4]], move_count=0,
+                 can_castle={'W': [False, False], 'B': [False, False]}, dead_pieces={'W': [], 'B': []},
+                 fifty_move_count=0):
         self.king_pos = king_pos
         self.move_count = move_count
         # King side 2nd element, Queen side 1st element.
@@ -36,10 +39,13 @@ class Board:
                     copy_grid[row].append([self.grid[row][col][0], None])
 
         copy_king_pos = list(map(lambda pos: [pos[0], pos[1]], self.king_pos))
-        copy_can_castle = {'W': list(map(lambda castle: castle, self.can_castle['W'])), 'B': list(map(lambda castle: castle, self.can_castle['B']))}
-        copy_dead_pieces = {'W': list(map(lambda piece: piece.__copy__(), self.dead_pieces['W'])), 'B': list(map(lambda piece: piece.__copy__(), self.dead_pieces['B']))}
+        copy_can_castle = {'W': list(map(lambda castle: castle, self.can_castle['W'])),
+                           'B': list(map(lambda castle: castle, self.can_castle['B']))}
+        copy_dead_pieces = {'W': list(map(lambda piece: piece.__copy__(), self.dead_pieces['W'])),
+                            'B': list(map(lambda piece: piece.__copy__(), self.dead_pieces['B']))}
         copy_fifty_move_count = self.fifty_move_count
-        return Board(copy_grid, copy_king_pos, self.move_count, copy_can_castle, copy_dead_pieces, copy_fifty_move_count)
+        return Board(copy_grid, copy_king_pos, self.move_count, copy_can_castle, copy_dead_pieces,
+                     copy_fifty_move_count)
 
     def clear_board(self):
         for row in self.grid:
@@ -65,7 +71,6 @@ class Board:
         valid_moves = self.compute_valid_moves(r1, c1, team, filter_check_moves)
 
         if not filter(lambda move: move == [r2, c2], valid_moves):
-            # print("Invalid move")
             return False
 
         self.fifty_move_count += 1
@@ -73,6 +78,8 @@ class Board:
 
         # No valid moves replace a piece with its own team member
         if destination is not None:
+            destination.defended_by.clear()
+            destination.attacked_by.clear()
             self.dead_pieces[destination.team].append(destination)
             self.fifty_move_count = 0
 
@@ -81,23 +88,22 @@ class Board:
 
         if c2 - c1 == 2 and piece.piece_type == 'K':
             # King Side Castle
-            rook = self.get_piece(r1, self.rows-1)
-            self.set_piece(r1, self.rows-1, None)
-            self.set_piece(r1, c2-1, rook)
+            rook = self.get_piece(r1, self.rows - 1)
+            self.set_piece(r1, self.rows - 1, None)
+            self.set_piece(r1, c2 - 1, rook)
             piece.castled = True
         elif c2 - c1 == -2 and piece.piece_type == 'K':
             # Queen Side Castle
             rook = self.get_piece(r1, 0)
             self.set_piece(r1, 0, None)
-            self.set_piece(r1, c2+1, rook)
+            self.set_piece(r1, c2 + 1, rook)
             piece.castled = True
         if piece.piece_type == 'P':
             self.fifty_move_count = 0
             if r2 == self.rows or r2 == 0:
                 # Promotion
-                # TODO: pawn promotion as part of minimax not automatically choose highest value piece
+                # TODO: pawn promotion as part of minimax not automatically choose highest value piece as done here
                 # self.dead_pieces[team].append(piece)
-                # print("Promotion Time: ")
                 # print(self.dead_pieces[team])
                 # revive_piece_text = input("Enter display text as desired for piece to reintroduce")
                 # dead_pieces_display_texts = map(lambda p : p.display_text, self.dead_pieces[team])
@@ -112,6 +118,8 @@ class Board:
 
         self.move_count += 1
         piece.moved = True
+        piece.defended_by.clear()
+        piece.attacked_by.clear()
 
         return piece.moved
 
@@ -124,9 +132,9 @@ class Board:
         i = 0
         while i < 3:
             self.set_piece(0, i, chess_piece.Piece('B', self.pieces[i + 1], i))
-            self.set_piece(0, self.rows - (i + 1), chess_piece.Piece('B', self.pieces[i + 1], i+4))
+            self.set_piece(0, self.rows - (i + 1), chess_piece.Piece('B', self.pieces[i + 1], i + 4))
             self.set_piece(self.rows - 1, i, chess_piece.Piece('W', self.pieces[i + 1], i))
-            self.set_piece(self.rows - 1, self.rows - (i + 1), chess_piece.Piece('W', self.pieces[i + 1], i+4))
+            self.set_piece(self.rows - 1, self.rows - (i + 1), chess_piece.Piece('W', self.pieces[i + 1], i + 4))
             i += 1
 
         # Queen
@@ -160,8 +168,8 @@ class Board:
             for col in range(self.rows):
                 temp_piece = self.get_piece(row, col)
                 if temp_piece is not None and temp_piece.team != king_piece.team:
-                    if list(filter(lambda pos: pos == [r1, c1], self.compute_valid_moves(row, col, temp_piece.team, False))):
-                        # print('check')
+                    if list(filter(lambda pos: pos == [r1, c1],
+                                   self.compute_valid_moves(row, col, temp_piece.team, False))):
                         return True
 
         return False
@@ -201,11 +209,11 @@ class Board:
         if piece.piece_type == 'K':
             if move[1] - c1 == 2:
                 # King side
-                temp_state.set_piece(r1, c1-1, temp_state.get_piece(r1, self.rows-1))
-                temp_state.set_piece(r1, self.rows-1, None)
+                temp_state.set_piece(r1, c1 - 1, temp_state.get_piece(r1, self.rows - 1))
+                temp_state.set_piece(r1, self.rows - 1, None)
             elif move[1] - c1 == 2:
                 # Queen side
-                temp_state.set_piece(r1, c1+1, temp_state.get_piece(r1, 0))
+                temp_state.set_piece(r1, c1 + 1, temp_state.get_piece(r1, 0))
                 temp_state.set_piece(r1, 0, None)
         return temp_state.in_range(move[0], move[1]) and temp_state.position_in_check(piece.team)
 
@@ -230,11 +238,13 @@ class Board:
             if top_right is not None:
                 if top_right.team != piece.team:
                     valid_moves.append([r1 + (direction * 1), c1 + 1])
+                    self.get_piece(r1 + (direction * 1), c1 + 1).attacked_by.append([r1, c1])
                 else:
                     self.get_piece(r1 + (direction * 1), c1 + 1).defended_by.append([r1, c1])
             if top_left is not None:
                 if top_left.team != piece.team:
                     valid_moves.append([r1 + (direction * 1), c1 - 1])
+                    self.get_piece(r1 + (direction * 1), c1 - 1).attacked_by.append([r1, c1])
                 else:
                     self.get_piece(r1 + (direction * 1), c1 - 1).defended_by.append([r1, c1])
 
@@ -249,7 +259,9 @@ class Board:
                 if self.in_range(r1 + (sign[0] * i), c1 + (sign[1] * i)):
                     if self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)).team != piece.team:
                         valid_moves.append([r1 + (sign[0] * i), c1 + (sign[1] * i)])
+                        self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)).attacked_by.append([r1, c1])
                     else:
+                        # pass
                         self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)).defended_by.append([r1, c1])
 
         if piece.piece_type == 'N':
@@ -259,13 +271,17 @@ class Board:
                 if self.in_range(r1 + (sign[0] * 1), c1 + (sign[1] * 2)):
                     if self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)) is None or self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)).team != piece.team:
                         valid_moves.append([r1 + (sign[0] * 1), c1 + (sign[1] * 2)])
+                        # self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)).attacked_by.append([r1, c1])
                     else:
-                        self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)).defended_by.append([r1, c1])
+                        pass
+                        # self.get_piece(r1 + (sign[0] * 1), c1 + (sign[1] * 2)).defended_by.append([r1, c1])
                 if self.in_range(r1 + (sign[0] * 2), c1 + (sign[1] * 1)):
                     if self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)) is None or self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)).team != piece.team:
                         valid_moves.append([r1 + (sign[0] * 2), c1 + (sign[1] * 1)])
+                        # self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)).attacked_by.append([r1, c1])
                     else:
-                        self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)).defended_by.append([r1, c1])
+                        pass
+                        # self.get_piece(r1 + (sign[0] * 2), c1 + (sign[1] * 1)).defended_by.append([r1, c1])
 
         if piece.piece_type == 'B' or piece.piece_type == 'Q':
             signs = [[1, 1], [1, -1], [-1, 1], [-1, -1]]
@@ -279,7 +295,9 @@ class Board:
                 if self.in_range(r1 + (sign[0] * i), c1 + (sign[1] * i)):
                     if self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)).team != piece.team:
                         valid_moves.append([r1 + (sign[0] * i), c1 + (sign[1] * i)])
+                        self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)).attacked_by.append([r1, c1])
                     else:
+                        # pass
                         self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)).defended_by.append([r1, c1])
 
         if piece.piece_type == 'K':
@@ -290,17 +308,16 @@ class Board:
                         valid_moves.append([row, col])
 
             # Castling
-
             if piece.moved:
                 self.can_castle[team] = [False, False]
             else:
                 # King side
                 self.can_castle[team] = [True, True]
-                for col in range(c1+1, self.rows-1):
+                for col in range(c1 + 1, self.rows - 1):
                     if self.get_piece(r1, col) is not None:
                         self.can_castle[team][1] = False
                         pass
-                far_right_piece = self.get_piece(r1, self.rows-1)
+                far_right_piece = self.get_piece(r1, self.rows - 1)
                 self.can_castle[team][1] = self.can_castle[team][1] and far_right_piece is not None and far_right_piece.piece_type == 'R' and far_right_piece.team == team and not far_right_piece.moved
                 # Queen side
                 for col in range(1, c1):
@@ -311,12 +328,12 @@ class Board:
                 self.can_castle[team][0] = self.can_castle[team][0] and far_left_piece is not None and far_left_piece.piece_type == 'R' and far_left_piece.team == team and not far_left_piece.moved
 
                 if self.can_castle[team][1]:
-                    valid_moves.append([r1, c1+2])
+                    valid_moves.append([r1, c1 + 2])
                 if self.can_castle[team][0]:
-                    valid_moves.append([r1, c1-2])
+                    valid_moves.append([r1, c1 - 2])
 
         if filter_check_moves:
-            valid_moves = list(filter(lambda move: self.in_range(move[0], move[1]) and not self.results_in_check(r1, c1, move, not filter_check_moves), valid_moves))
+            valid_moves = list(filter(lambda move: self.in_range(move[0], move[1]) and not self.results_in_check(r1, c1, move, not filter_check_moves),valid_moves))
 
         return valid_moves
 
@@ -344,19 +361,22 @@ class Board:
         for row in range(self.rows):
             for col in range(self.rows):
                 piece = self.get_piece(row, col)
-                color_based_access = [[row, col], [self.rows-1-row, self.rows-1-col]] if team == 'W' else [[self.rows-1-row, self.rows-1-col], [row, col]]
+                color_based_access = [[row, col], [self.rows - 1 - row, self.rows - 1 - col]] if team == 'W' else [[self.rows - 1 - row, self.rows - 1 - col], [row, col]]
                 if piece is None:
                     pass
                 elif piece.team == team:
                     material_balance += tables.centipawn_piece_dict[piece.piece_type]
-                    positional_balance += tables.centipawn_position_dict[piece.piece_type][color_based_access[0][0]][color_based_access[0][1]]
+                    positional_balance += tables.centipawn_position_dict[piece.piece_type][color_based_access[0][0]][
+                        color_based_access[0][1]]
                     if piece.piece_type == 'B':
                         other_defended_pieces_count += len(piece.defended_by)
+                        other_defended_pieces_count -= len(piece.attacked_by)
                         bishop_count += 1
                     elif piece.piece_type == 'P':
                         defended_pawns_count += len(piece.defended_by)
                     else:
                         other_defended_pieces_count += len(piece.defended_by)
+                        other_defended_pieces_count -= len(piece.attacked_by)
                     if 2 < col < 5:
                         if 2 < row < 5:
                             positional_balance += 35
@@ -366,14 +386,17 @@ class Board:
                         positional_balance += 350
                 else:
                     material_balance -= tables.centipawn_piece_dict[piece.piece_type]
-                    positional_balance -= tables.centipawn_position_dict[piece.piece_type][color_based_access[1][0]][color_based_access[1][1]]
+                    positional_balance -= tables.centipawn_position_dict[piece.piece_type][color_based_access[1][0]][
+                        color_based_access[1][1]]
                     if piece.piece_type == 'B':
                         bishop_count -= 1
                         other_defended_pieces_count -= len(piece.defended_by)
+                        other_defended_pieces_count += len(piece.attacked_by)
                     elif piece.piece_type == 'P':
                         defended_pawns_count -= len(piece.defended_by)
                     else:
                         other_defended_pieces_count -= len(piece.defended_by)
+                        other_defended_pieces_count += len(piece.attacked_by)
                     if 2 < col < 5:
                         if 2 < row < 5:
                             positional_balance -= 35
@@ -385,7 +408,8 @@ class Board:
         if bishop_count == 2 or bishop_count == -2:
             material_balance += (bishop_count * 25)
 
-        return material_balance + positional_balance + mobility_score + (defended_pawns_count * 30) + (other_defended_pieces_count * 4)
+        scale = 7 if self.move_count > 12 else 45 - (self.move_count*5/6)
+        return material_balance + positional_balance + mobility_score + (defended_pawns_count * 5) + (other_defended_pieces_count * scale)
 
     def search_game_tree(self, start_team, moves, game_boards):
         if moves == 0:
@@ -403,11 +427,12 @@ class Board:
                             game_boards.append(temp_state)
                         temp_state.search_game_tree(opponent_team, moves - 1, game_boards)
 
-
     def minimax(self, depth, team, maximiser, alpha=float('-inf'), beta=float('inf')):
-        opposition_team = self.colors[(self.colors.index(team)+1)%2]
+        opposition_team = self.colors[(self.colors.index(team) + 1) % 2]
+
         if depth == 0 or self.check_checkmate(team) or self.check_checkmate(opposition_team):
             return self
+
         boards = []
         self.search_game_tree(team, 1, boards)
         max_value = float('-inf')
@@ -415,7 +440,7 @@ class Board:
 
         if maximiser:
             for board in boards:
-                minimax_board = board.minimax(depth-1, opposition_team, not maximiser, alpha, beta)
+                minimax_board = board.minimax(depth - 1, opposition_team, not maximiser, alpha, beta)
                 board_score = minimax_board.evaluate_score(team)
                 if board_score > max_value:
                     max_value = board_score
@@ -425,7 +450,7 @@ class Board:
                     break
         else:
             for board in boards:
-                minimax_board = board.minimax(depth-1, opposition_team, not maximiser, alpha, beta)
+                minimax_board = board.minimax(depth - 1, opposition_team, not maximiser, alpha, beta)
                 board_score = minimax_board.evaluate_score(team)
                 if board_score > max_value:
                     max_value = board_score
@@ -437,8 +462,8 @@ class Board:
         return max_board
 
     def display_dead_pieces(self):
-        print(list(map(lambda piece : piece.display_text, self.dead_pieces['W'])))
-        print(list(map(lambda piece : piece.display_text, self.dead_pieces['B'])))
+        print(list(map(lambda piece: piece.display_text, self.dead_pieces['W'])))
+        print(list(map(lambda piece: piece.display_text, self.dead_pieces['B'])))
 
     # Prints to terminal a representation of board if board.svg unviewable
     def display_board(self):
@@ -456,21 +481,16 @@ class Board:
                 piece = self.get_piece(row, col)
                 if piece is None:
                     empty_count += 1
-                elif piece.team == 'B':
-                    if empty_count != 0:
-                        board_string += str(empty_count)
-                        empty_count = 0
-                    board_string += piece.piece_type.lower()
                 else:
                     if empty_count != 0:
                         board_string += str(empty_count)
                         empty_count = 0
-                    board_string += piece.piece_type
+                    board_string += piece.piece_type.lower() if piece.team == 'B' else piece.piece_type
 
-                if col == self.rows-1 and empty_count != 0:
+                if col == self.rows - 1 and empty_count != 0:
                     board_string += str(empty_count)
                     empty_count = 0
-            if row < self.rows-1:
+            if row < self.rows - 1:
                 board_string += "/"
 
         print(board_string)
@@ -488,7 +508,6 @@ class Board:
         for row in range(len(board_string)):
             row_string = list(board_string[row])
             self.import_board_row(row_string, row)
-        self.display_board()
 
     def import_board_row(self, row_string, row, col=0):
         # Pre: assumes board_string well formed.
@@ -497,7 +516,7 @@ class Board:
         if row_string[0].isdigit():
             spaces = int(row_string[0])
             for i in range(spaces):
-                self.set_piece(row, col+i, None)
+                self.set_piece(row, col + i, None)
             col += spaces
         if row_string[0].islower():
             self.set_piece(row, col, chess_piece.Piece('B', row_string[0].upper(), 3, False, True))
@@ -506,8 +525,6 @@ class Board:
             self.set_piece(row, col, chess_piece.Piece('W', row_string[0], 3, False, True))
             col += 1
         self.import_board_row([row_string[i] for i in range(1, len(row_string))], row, col)
-
-
 
 
 def differences_between_boards(b1, b2):
@@ -522,7 +539,7 @@ def differences_between_boards(b1, b2):
                 differences.append([(row, col), (dest[0], dest[1])])
             elif piece1 is not None and piece2 is not None and piece1.display_text != piece2.display_text:
                 src = b1.locate_piece(piece2)
-                differences.append(['X', (src[0], src[1]), (row, col)])
+                # differences.append(['X', (src[0], src[1]), (row, col)])
 
     return differences
 
@@ -530,13 +547,15 @@ def differences_between_boards(b1, b2):
 if __name__ == "__main__":
     board = Board()
     board.setup_pieces()
+    pawn = board.get_piece(0, 0)
+
     board.update_board_svg()
     # board.import_board("rnbqkbnr/ppp2ppp/3pp3/8/8/8/PPPPPPPP/RNBQKBNR")
     # board.update_board_svg()
 
     i = 0
-    while not board.check_checkmate(board.colors[i%2]) and board.fifty_move_count < 50:
-        next_board = board.minimax(2, board.colors[i%2], True)
+    while not board.check_checkmate(board.colors[i % 2]) and board.fifty_move_count < 50:
+        next_board = board.minimax(2, board.colors[i % 2], True)
 
         if next_board is None:
             print('Stalemate')
@@ -545,15 +564,19 @@ if __name__ == "__main__":
         # next_board.display_board()
         next_board.update_board_svg()
         # print(next_board.evaluate_score(board.colors[i%2]))
-        # print(differences_between_boards(board, next_board))
+        # differences = differences_between_boards(board, next_board)
+        # print(differences)
+        # print(list(map(lambda pos: next_board.get_piece(pos[1][0], pos[1][1]).defended_by, differences)))
+        # print(list(map(lambda pos: next_board.get_piece(pos[1][0], pos[1][1]).attacked_by, differences)))
+
         # next_board.display_dead_pieces()
-        print(board.colors[i%2] + "'s move. Move " + str(i+1) + ".")
+        print(board.colors[i % 2] + "'s move. Move " + str(i + 1) + ".")
         board = next_board
         i += 1
 
     if board.fifty_move_count >= 50:
         print('Draw by 50 move rule')
     else:
-        print(board.colors[(i+1)%2] + " wins!")
+        print(board.colors[(i + 1) % 2] + " wins!")
 
     print('Done')
