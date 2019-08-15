@@ -345,9 +345,17 @@ class Board:
         # TODO: Passed pawns, King Safety and Pawn Structure.
         # TODO: pawn rams, pawn levers, duo trio quart
 
+        opposition = self.colors[(self.colors.index(team)+1) % 2]
+
+        if self.check_checkmate(opposition):
+            return float('inf')
+
+        if self.check_checkmate(team):
+            return float('-inf')
+
         further_moves = []
         self.search_game_tree(team, 1, further_moves)
-        mobility_score = len(further_moves) * 2
+        mobility_score = len(further_moves) * 3
 
         material_balance = 0
         positional_balance = 0
@@ -414,8 +422,23 @@ class Board:
         if bishop_count == 2 or bishop_count == -2:
             material_balance += (bishop_count * 25)
 
+        # When to avoid, and when to play, for draw
+
+        if self.fifty_move_count > 46:
+            if len(self.dead_pieces[team]) < len(self.dead_pieces[opposition]):
+                positional_balance -= 2000
+            else:
+                positional_balance += 2000
+
+        # Go for check towards end:
+
         dead_pieces = len(self.dead_pieces['W']) + len(self.dead_pieces['B'])
-        scale = 500 if dead_pieces > 12 else 960 - (dead_pieces*6)
+
+        if dead_pieces > 14 and self.position_in_check(opposition):
+            positional_balance += 8000
+
+        scale = 500 if dead_pieces > 12 else 800 - (dead_pieces*8) - (self.move_count*3)
+
         return material_balance + positional_balance + mobility_score + (defended_pawns_count * 5) + (other_defended_pieces_count * scale)
 
     def search_game_tree(self, start_team, moves, game_boards):
@@ -437,7 +460,7 @@ class Board:
     def minimax(self, depth, team, maximiser, alpha=float('-inf'), beta=float('inf')):
         opposition_team = self.colors[(self.colors.index(team) + 1) % 2]
 
-        if depth == 0 or self.check_checkmate(team) or self.check_checkmate(opposition_team):
+        if depth == 0:
             return self
 
         boards = []
