@@ -227,8 +227,8 @@ class Board:
         if piece.piece_type == 'P':
             if self.get_piece(r1 + (direction * 1), c1) is None:
                 valid_moves.append([r1 + (direction * 1), c1])
-            if not piece.moved and self.get_piece(r1 + (direction * 2), c1) is None:
-                valid_moves.append([r1 + (direction * 2), c1])
+                if not piece.moved and self.get_piece(r1 + (direction * 2), c1) is None and self:
+                    valid_moves.append([r1 + (direction * 2), c1])
 
             top_right = self.get_piece(r1 + (direction * 1), c1 + 1)
             top_left = self.get_piece(r1 + (direction * 1), c1 - 1)
@@ -394,7 +394,7 @@ class Board:
                         elif 1 < row < 6:
                             positional_balance += 10
                     if piece.castled is not None and piece.castled:
-                        positional_balance += 350
+                        positional_balance += 300
                 else:
                     attacked_by = []
                     piece.attacked_by = list(filter(lambda pos: attacked_by.append(pos) if pos not in attacked_by else pos, piece.attacked_by))
@@ -417,7 +417,7 @@ class Board:
                         elif 1 < row < 6:
                             positional_balance -= 10
                     if piece.castled is not None and piece.castled:
-                        positional_balance -= 350
+                        positional_balance -= 300
 
         if bishop_count == 2 or bishop_count == -2:
             material_balance += (bishop_count * 25)
@@ -437,7 +437,7 @@ class Board:
         if dead_pieces > 14 and self.position_in_check(opposition):
             positional_balance += 8000
 
-        scale = 500 if dead_pieces > 12 else 800 - (dead_pieces*8) - (self.move_count*3)
+        scale = 500 if dead_pieces > 12 else 800 - (dead_pieces*8) - (self.move_count*2)
 
         return material_balance + positional_balance + mobility_score + (defended_pawns_count * 5) + (other_defended_pieces_count * scale)
 
