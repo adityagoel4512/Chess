@@ -414,7 +414,8 @@ class Board:
         if bishop_count == 2 or bishop_count == -2:
             material_balance += (bishop_count * 25)
 
-        scale = 490 if self.move_count > 12 else 1000 - (self.move_count*6)
+        dead_pieces = len(self.dead_pieces['W']) + len(self.dead_pieces['B'])
+        scale = 500 if dead_pieces > 12 else 960 - (dead_pieces*6)
         return material_balance + positional_balance + mobility_score + (defended_pawns_count * 5) + (other_defended_pieces_count * scale)
 
     def search_game_tree(self, start_team, moves, game_boards):
