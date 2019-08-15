@@ -10,8 +10,10 @@ class Board:
     pieces = ['P', 'R', 'N', 'B', 'Q', 'K']
 
     def __init__(self, grid=None, king_pos=[[7, 4], [0, 4]], move_count=0,
-                 can_castle={'W': [False, False], 'B': [False, False]}, dead_pieces={'W': [], 'B': []},
+                 can_castle={'W': [False, False], 'B': [False, False]},
+                 dead_pieces={'W': [], 'B': []},
                  fifty_move_count=0):
+
         self.king_pos = king_pos
         self.move_count = move_count
         # King side 2nd element, Queen side 1st element.
@@ -110,9 +112,9 @@ class Board:
                 #     revive_piece_text = input("Enter valid display text as desired for piece to reintroduce")
                 # promotion_piece = filter(lambda p : p.display_text == revive_piece_text, self.dead_pieces[team])[0]
                 # self.set_piece(r2, c2, promotion_piece)
-
+                print('Promoting!')
                 self.dead_pieces[team].append(piece)
-                self.dead_pieces[team].sort(reverse=True, key=lambda p: tables.centipawn_piece_dict[p.piece_type])
+                self.dead_pieces[team].sort(reverse=False, key=lambda p: tables.centipawn_piece_dict[p.piece_type])
                 self.set_piece(r2, c2, self.dead_pieces[team][0])
 
         self.move_count += 1
@@ -577,7 +579,6 @@ def differences_between_boards(b1, b2):
 if __name__ == "__main__":
     board = Board()
     board.setup_pieces()
-    pawn = board.get_piece(0, 0)
 
     board.update_board_svg()
 
@@ -592,7 +593,6 @@ if __name__ == "__main__":
         if next_board is None:
             print('Stalemate')
             break
-
 
         # differences = differences_between_boards(board, next_board)
         # print(differences)
