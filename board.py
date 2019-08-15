@@ -3,7 +3,6 @@ import piece_square_tables as tables
 import chess
 import chess.svg
 
-
 class Board:
     grid = []
     rows = 8
@@ -168,8 +167,7 @@ class Board:
             for col in range(self.rows):
                 temp_piece = self.get_piece(row, col)
                 if temp_piece is not None and temp_piece.team != king_piece.team:
-                    if list(filter(lambda pos: pos == [r1, c1],
-                                   self.compute_valid_moves(row, col, temp_piece.team, False))):
+                    if list(filter(lambda pos: pos == [r1, c1], self.compute_valid_moves(row, col, temp_piece.team, False))):
                         return True
 
         return False
@@ -365,18 +363,22 @@ class Board:
                 if piece is None:
                     pass
                 elif piece.team == team:
+                    attacked_by = []
+                    piece.attacked_by = list(filter(lambda pos : attacked_by.append(pos) if pos not in attacked_by else pos, piece.attacked_by))
+                    piece.attacked_by = attacked_by
+
                     material_balance += tables.centipawn_piece_dict[piece.piece_type]
-                    positional_balance += tables.centipawn_position_dict[piece.piece_type][color_based_access[0][0]][
-                        color_based_access[0][1]]
+                    positional_balance += tables.centipawn_position_dict[piece.piece_type][color_based_access[0][0]][color_based_access[0][1]]
+                    proportion = tables.centipawn_piece_dict[piece.piece_type]/tables.centipawn_piece_dict['Q'] if piece.piece_type != 'K' else 0.5
                     if piece.piece_type == 'B':
-                        other_defended_pieces_count += len(piece.defended_by)
-                        other_defended_pieces_count -= len(piece.attacked_by)
+                        other_defended_pieces_count += len(piece.defended_by)*proportion
+                        other_defended_pieces_count -= len(piece.attacked_by)*proportion
                         bishop_count += 1
                     elif piece.piece_type == 'P':
                         defended_pawns_count += len(piece.defended_by)
                     else:
-                        other_defended_pieces_count += len(piece.defended_by)
-                        other_defended_pieces_count -= len(piece.attacked_by)
+                        other_defended_pieces_count += len(piece.defended_by)*proportion
+                        other_defended_pieces_count -= len(piece.attacked_by)*proportion
                     if 2 < col < 5:
                         if 2 < row < 5:
                             positional_balance += 35
@@ -385,18 +387,21 @@ class Board:
                     if piece.castled is not None and piece.castled:
                         positional_balance += 350
                 else:
+                    attacked_by = []
+                    piece.attacked_by = list(filter(lambda pos: attacked_by.append(pos) if pos not in attacked_by else pos, piece.attacked_by))
+                    piece.attacked_by = attacked_by
                     material_balance -= tables.centipawn_piece_dict[piece.piece_type]
-                    positional_balance -= tables.centipawn_position_dict[piece.piece_type][color_based_access[1][0]][
-                        color_based_access[1][1]]
+                    positional_balance -= tables.centipawn_position_dict[piece.piece_type][color_based_access[1][0]][color_based_access[1][1]]
+                    proportion = tables.centipawn_piece_dict[piece.piece_type]/tables.centipawn_piece_dict['Q'] if piece.piece_type != 'K' else 0.5
                     if piece.piece_type == 'B':
                         bishop_count -= 1
-                        other_defended_pieces_count -= len(piece.defended_by)
-                        other_defended_pieces_count += len(piece.attacked_by)
+                        other_defended_pieces_count -= len(piece.defended_by)*proportion
+                        other_defended_pieces_count += len(piece.attacked_by)*proportion
                     elif piece.piece_type == 'P':
                         defended_pawns_count -= len(piece.defended_by)
                     else:
-                        other_defended_pieces_count -= len(piece.defended_by)
-                        other_defended_pieces_count += len(piece.attacked_by)
+                        other_defended_pieces_count -= len(piece.defended_by)*proportion
+                        other_defended_pieces_count += len(piece.attacked_by)*proportion
                     if 2 < col < 5:
                         if 2 < row < 5:
                             positional_balance -= 35
@@ -408,7 +413,7 @@ class Board:
         if bishop_count == 2 or bishop_count == -2:
             material_balance += (bishop_count * 25)
 
-        scale = 7 if self.move_count > 12 else 45 - (self.move_count*5/6)
+        scale = 490 if self.move_count > 12 else 1000 - (self.move_count*6)
         return material_balance + positional_balance + mobility_score + (defended_pawns_count * 5) + (other_defended_pieces_count * scale)
 
     def search_game_tree(self, start_team, moves, game_boards):
@@ -496,10 +501,10 @@ class Board:
         print(board_string)
         return board_string
 
-    def update_board_svg(self):
+    def update_board_svg(self, filename="board.svg"):
         board = chess.Board(self.export_board_string())
         svg_text = chess.svg.board(board)
-        svg_file = open("board.svg", "w")
+        svg_file = open(filename, "w")
         svg_file.write(svg_text)
         svg_file.close()
 
@@ -550,27 +555,30 @@ if __name__ == "__main__":
     pawn = board.get_piece(0, 0)
 
     board.update_board_svg()
+
     # board.import_board("rnbqkbnr/ppp2ppp/3pp3/8/8/8/PPPPPPPP/RNBQKBNR")
     # board.update_board_svg()
 
     i = 0
     while not board.check_checkmate(board.colors[i % 2]) and board.fifty_move_count < 50:
+
         next_board = board.minimax(2, board.colors[i % 2], True)
 
         if next_board is None:
             print('Stalemate')
             break
 
-        # next_board.display_board()
-        next_board.update_board_svg()
-        # print(next_board.evaluate_score(board.colors[i%2]))
+
         # differences = differences_between_boards(board, next_board)
         # print(differences)
-        # print(list(map(lambda pos: next_board.get_piece(pos[1][0], pos[1][1]).defended_by, differences)))
-        # print(list(map(lambda pos: next_board.get_piece(pos[1][0], pos[1][1]).attacked_by, differences)))
+        # print(list(map(lambda pos: next_board.get_piece(pos[1][0], pos[1][1]).defended_by if next_board.get_piece(pos[1][0], pos[1][1]) is not None else [], differences)))
+        # print(list(map(lambda pos: next_board.get_piece(pos[1][0], pos[1][1]).attacked_by if next_board.get_piece(pos[1][0], pos[1][1]) is not None else [], differences)))
 
         # next_board.display_dead_pieces()
         print(board.colors[i % 2] + "'s move. Move " + str(i + 1) + ".")
+        board.update_board_svg("oldboard.svg")
+        next_board.update_board_svg()
+
         board = next_board
         i += 1
 
