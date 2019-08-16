@@ -156,14 +156,7 @@ class Board:
         if king_piece is None:
             return True
 
-        for row in range(self.rows):
-            for col in range(self.rows):
-                temp_piece = self.get_piece(row, col)
-                if temp_piece is not None and temp_piece.team != king_piece.team:
-                    if list(filter(lambda pos: pos == [r1, c1], self.compute_valid_moves(row, col, temp_piece.team, False))):
-                        return True
-
-        return False
+        return king_piece.attacked_by
 
     def check_checkmate(self, side):
         i = self.colors.index(side)
@@ -337,6 +330,7 @@ class Board:
 
         # TODO: Passed pawns, King Safety and Pawn Structure.
         # TODO: pawn rams, pawn levers, duo trio quart
+        # TODO: open files next to king
 
         opposition = self.colors[(self.colors.index(team)+1) % 2]
 
@@ -357,6 +351,7 @@ class Board:
         other_defended_pieces_count = 0
 
         # If black piece table needs to be vertically reflected and horizontally reflected
+        direction = 1 if team == 'W' else 1
 
         for row in range(self.rows):
             for col in range(self.rows):
@@ -378,6 +373,28 @@ class Board:
                         bishop_count += 1
                     elif piece.piece_type == 'P':
                         defended_pawns_count += len(piece.defended_by)
+                    elif piece.piece_type == 'K':
+                        # King protection
+                        flank_protection = [False, False]
+
+                        for i in range(col, self.rows):
+                            temp_piece = self.get_piece(row, i)
+                            if self.get_piece(row, i) is not None and temp_piece.team == team:
+                                flank_protection[1] = True
+                                break
+                        for i in range(0, col):
+                            temp_piece = self.get_piece(row, i)
+                            if self.get_piece(row, i) is not None and temp_piece.team == team:
+                                flank_protection[0] = True
+                                break
+
+                        positional_balance += len(list(filter(lambda protected : protected, flank_protection))) * 125
+
+                        front_three_pieces = [self.get_piece(direction * 1 + row, col), self.get_piece(direction * 1 + row, col+1), self.get_piece(direction * 1 + row, col+1)]
+                        positional_balance += len(list(filter(lambda p : p is not None and p.team == team, front_three_pieces))) * 450
+                        other_defended_pieces_count += len(piece.defended_by) * proportion
+                        other_defended_pieces_count -= len(piece.attacked_by) * proportion
+
                     else:
                         other_defended_pieces_count += len(piece.defended_by)*proportion
                         other_defended_pieces_count -= len(piece.attacked_by)*proportion
@@ -401,6 +418,27 @@ class Board:
                         other_defended_pieces_count += len(piece.attacked_by)*proportion
                     elif piece.piece_type == 'P':
                         defended_pawns_count -= len(piece.defended_by)
+                    elif piece.piece_type == 'K':
+                        # King protection
+                        flank_protection = [False, False]
+
+                        for i in range(col, self.rows):
+                            temp_piece = self.get_piece(row, i)
+                            if self.get_piece(row, i) is not None and temp_piece.team == team:
+                                flank_protection[1] = True
+                                break
+                        for i in range(0, col):
+                            temp_piece = self.get_piece(row, i)
+                            if self.get_piece(row, i) is not None and temp_piece.team == team:
+                                flank_protection[0] = True
+                                break
+
+                        positional_balance -= len(list(filter(lambda protected: protected, flank_protection))) * 125
+
+                        front_three_pieces = [self.get_piece(direction * 1 + row, col), self.get_piece(direction * 1 + row, col+1), self.get_piece(direction * 1 + row, col+1)]
+                        positional_balance -= len(list(filter(lambda p : p is not None and p.team == team, front_three_pieces))) * 450
+                        other_defended_pieces_count -= len(piece.defended_by) * proportion
+                        other_defended_pieces_count += len(piece.attacked_by) * proportion
                     else:
                         other_defended_pieces_count -= len(piece.defended_by)*proportion
                         other_defended_pieces_count += len(piece.attacked_by)*proportion
