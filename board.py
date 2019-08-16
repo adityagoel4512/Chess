@@ -104,18 +104,9 @@ class Board:
             if r2 == self.rows or r2 == 0:
                 # Promotion
                 # TODO: pawn promotion as part of minimax not automatically choose highest value piece as done here
-                # self.dead_pieces[team].append(piece)
-                # print(self.dead_pieces[team])
-                # revive_piece_text = input("Enter display text as desired for piece to reintroduce")
-                # dead_pieces_display_texts = map(lambda p : p.display_text, self.dead_pieces[team])
-                # while revive_piece_text not in dead_pieces_display_texts:
-                #     revive_piece_text = input("Enter valid display text as desired for piece to reintroduce")
-                # promotion_piece = filter(lambda p : p.display_text == revive_piece_text, self.dead_pieces[team])[0]
-                # self.set_piece(r2, c2, promotion_piece)
-                print('Promoting!')
-                self.dead_pieces[team].append(piece)
-                self.dead_pieces[team].sort(reverse=False, key=lambda p: tables.centipawn_piece_dict[p.piece_type])
-                self.set_piece(r2, c2, self.dead_pieces[team][0])
+
+                self.set_piece(r2, c2, chess_piece.Piece(team, 'Q', 4))
+                self.update_board_svg()
 
         self.move_count += 1
         piece.moved = True
@@ -436,10 +427,12 @@ class Board:
 
         dead_pieces = len(self.dead_pieces['W']) + len(self.dead_pieces['B'])
 
-        if dead_pieces > 14 and self.position_in_check(opposition):
-            positional_balance += 8000
+        if self.position_in_check(opposition):
+            positional_balance += 6000 * dead_pieces/25
+        if self.position_in_check(team):
+            positional_balance -= 6000 * dead_pieces/25
 
-        scale = 500 if dead_pieces > 12 else 800 - (dead_pieces*8) - (self.move_count*2)
+        scale = 500 if dead_pieces > 12 else 800 - (dead_pieces*8) - (self.move_count*3)
 
         return material_balance + positional_balance + mobility_score + (defended_pawns_count * 5) + (other_defended_pieces_count * scale)
 
