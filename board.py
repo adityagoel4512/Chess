@@ -103,7 +103,7 @@ class Board:
             piece.castled = True
         if piece.piece_type == 'P':
             self.fifty_move_count = 0
-            if r2 == self.rows or r2 == 0:
+            if r2 == self.rows-1 or r2 == 0:
                 # Promotion
                 # TODO: pawn promotion as part of minimax not automatically choose highest value piece as done here
 
