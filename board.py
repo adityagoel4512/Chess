@@ -2,6 +2,7 @@ import piece as chess_piece
 import piece_square_tables as tables
 import chess
 import chess.svg
+import functools
 
 
 class Board:
@@ -46,8 +47,8 @@ class Board:
         copy_dead_pieces = {'W': list(map(lambda piece: piece.__copy__(), self.dead_pieces['W'])),
                             'B': list(map(lambda piece: piece.__copy__(), self.dead_pieces['B']))}
         copy_fifty_move_count = self.fifty_move_count
-        return Board(copy_grid, copy_king_pos, self.move_count, copy_can_castle, copy_dead_pieces,
-                     copy_fifty_move_count)
+        copy_move_count = self.move_count
+        return Board(copy_grid, copy_king_pos, copy_move_count, copy_can_castle, copy_dead_pieces, copy_fifty_move_count)
 
     def clear_board(self):
         for row in self.grid:
@@ -111,8 +112,6 @@ class Board:
 
         self.move_count += 1
         piece.moved = True
-        piece.defended_by.clear()
-        piece.attacked_by.clear()
 
         return piece.moved
 
@@ -157,7 +156,16 @@ class Board:
         if king_piece is None:
             return True
 
-        return king_piece.attacked_by
+        for row in range(self.rows):
+            for col in range(self.rows):
+                temp_piece = self.get_piece(row, col)
+                if temp_piece is not None and temp_piece.team != king_piece.team:
+                    if list(filter(lambda pos: pos == [r1, c1], self.compute_valid_moves(row, col, temp_piece.team, False))):
+                        if not king_piece.attacked_by:
+                            self.display_board()
+                        return True
+
+        return False
 
     def check_checkmate(self, side):
         i = self.colors.index(side)
@@ -176,12 +184,10 @@ class Board:
                 if piece is not None and piece.team == king.team:
                     moves = self.compute_valid_moves(row, col, piece.team, False)
                     for move in moves:
-                        if self.move_piece(row, col, move[0], move[1], piece.team, False):
-                            if not self.position_in_check(side):
+                        temp_state = self.__deepcopy__()
+                        if temp_state.move_piece(row, col, move[0], move[1], piece.team, False):
+                            if not temp_state.position_in_check(side):
                                 return False
-                            moved_piece = self.get_piece(move[0], move[1])
-                            self.set_piece(row, col, moved_piece)
-                            self.set_piece(move[0], move[1], None)
         return True
 
     def results_in_check(self, r1, c1, move, filter_check_moves):
@@ -248,7 +254,6 @@ class Board:
                         valid_moves.append([r1 + (sign[0] * i), c1 + (sign[1] * i)])
                         self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)).attacked_by.append([r1, c1])
                     else:
-                        # pass
                         self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)).defended_by.append([r1, c1])
 
         if piece.piece_type == 'N':
@@ -343,8 +348,8 @@ class Board:
         if self.check_checkmate(opposition):
             return float('inf')
 
-        if self.check_checkmate(team):
-            return float('-inf')
+        # if self.check_checkmate(team):
+        #     return float('-inf')
 
         further_moves = []
         self.search_game_tree(team, 1, further_moves)
@@ -355,6 +360,7 @@ class Board:
         bishop_count = 0
         defended_pawns_count = 0
         other_defended_pieces_count = 0
+        net_value_defence_attack = 0
 
         # If black piece table needs to be vertically reflected and horizontally reflected
         direction = 1 if team == 'W' else 1
@@ -362,21 +368,19 @@ class Board:
         for row in range(self.rows):
             for col in range(self.rows):
                 piece = self.get_piece(row, col)
-                color_based_access = [[row, col], [self.rows - 1 - row, self.rows - 1 - col]] if team == 'W' else [[self.rows - 1 - row, self.rows - 1 - col], [row, col]]
+                color_based_access = [[row, col], [self.rows - 1 - row, self.rows - 1 - col]] if team == 'W' else [
+                    [self.rows - 1 - row, self.rows - 1 - col], [row, col]]
                 if piece is None:
                     pass
                 elif piece.team == team:
-                    attacked_by = []
-                    piece.attacked_by = list(filter(lambda pos: attacked_by.append(pos) if pos not in attacked_by else pos, piece.attacked_by))
-                    piece.attacked_by = attacked_by
 
                     material_balance += tables.centipawn_piece_dict[piece.piece_type]
                     positional_balance += tables.centipawn_position_dict[piece.piece_type][color_based_access[0][0]][color_based_access[0][1]]
-                    proportion = tables.centipawn_piece_dict[piece.piece_type] / tables.centipawn_piece_dict['Q'] if piece.piece_type != 'K' else 0.5
+                    proportion = tables.centipawn_piece_dict[piece.piece_type]*2 / tables.centipawn_piece_dict['Q'] if piece.piece_type != 'K' else 0.01
 
                     if piece.piece_type == 'B':
                         other_defended_pieces_count += len(piece.defended_by) * proportion
-                        other_defended_pieces_count -= len(piece.attacked_by) * proportion + 0.1
+                        other_defended_pieces_count -= len(piece.attacked_by) * proportion
                         bishop_count += 1
                     elif piece.piece_type == 'P':
                         defended_pawns_count += len(piece.defended_by)
@@ -398,16 +402,37 @@ class Board:
                         positional_balance += len(list(filter(lambda protected: protected, flank_protection))) * 125
 
                         front_three_pieces = [self.get_piece(direction * 1 + row, col),
-                                              self.get_piece(direction * 1 + row, col + 1),
+                                              self.get_piece(direction * 1 + row, col - 1),
                                               self.get_piece(direction * 1 + row, col + 1)]
 
-                        positional_balance += len(list(filter(lambda p: p is not None and p.team == team, front_three_pieces))) * 450
+                        positional_balance += len(list(filter(lambda p: p is not None and p.team == team, front_three_pieces))) * 300
                         other_defended_pieces_count += len(piece.defended_by) * proportion
-                        other_defended_pieces_count -= len(piece.attacked_by) * proportion + 0.1
+                        other_defended_pieces_count -= len(piece.attacked_by) * proportion
 
                     else:
                         other_defended_pieces_count += len(piece.defended_by) * proportion
-                        other_defended_pieces_count -= len(piece.attacked_by) * proportion + 0.1
+                        other_defended_pieces_count -= len(piece.attacked_by) * proportion
+
+                    if piece.attacked_by:
+                        attacked_by = []
+                        piece.attacked_by = list(filter(lambda pos: attacked_by.append(pos) if pos not in attacked_by else pos, piece.attacked_by))
+                        piece.attacked_by = attacked_by
+
+                        king_value = tables.centipawn_piece_dict['K']
+                        for pos in piece.attacked_by:
+                            net_value_defence_attack -= king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
+
+                        piece.attacked_by.clear()
+                    if piece.defended_by:
+                        defended_by = []
+                        piece.defended_by = list(filter(lambda pos: defended_by.append(pos) if pos not in defended_by else pos, piece.defended_by))
+                        piece.defended_by = defended_by
+
+                        king_value = tables.centipawn_piece_dict['K']
+                        for pos in piece.attacked_by:
+                            net_value_defence_attack += king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
+
+                        piece.defended_by.clear()
 
                     if 2 < col < 5:
                         if 2 < row < 5:
@@ -418,18 +443,15 @@ class Board:
                     if piece.castled is not None and piece.castled:
                         positional_balance += 300
                 else:
-                    attacked_by = []
-                    piece.attacked_by = list(filter(lambda pos: attacked_by.append(pos) if pos not in attacked_by else pos, piece.attacked_by))
-                    piece.attacked_by = attacked_by
 
                     material_balance -= tables.centipawn_piece_dict[piece.piece_type]
                     positional_balance -= tables.centipawn_position_dict[piece.piece_type][color_based_access[1][0]][color_based_access[1][1]]
-                    proportion = tables.centipawn_piece_dict[piece.piece_type] / tables.centipawn_piece_dict['Q'] if piece.piece_type != 'K' else 0.5
+                    proportion = tables.centipawn_piece_dict[piece.piece_type] / tables.centipawn_piece_dict['Q'] if piece.piece_type != 'K' else 0.2
 
                     if piece.piece_type == 'B':
                         bishop_count -= 1
                         other_defended_pieces_count -= len(piece.defended_by) * proportion
-                        other_defended_pieces_count += len(piece.attacked_by) * proportion + 0.1
+                        other_defended_pieces_count += len(piece.attacked_by) * proportion
                     elif piece.piece_type == 'P':
                         defended_pawns_count -= len(piece.defended_by)
                     elif piece.piece_type == 'K':
@@ -451,14 +473,36 @@ class Board:
 
                         front_three_pieces = [self.get_piece(direction * 1 + row, col),
                                               self.get_piece(direction * 1 + row, col + 1),
-                                              self.get_piece(direction * 1 + row, col + 1)]
+                                              self.get_piece(direction * 1 + row, col - 1)]
 
-                        positional_balance -= len(list(filter(lambda p: p is not None and p.team == team, front_three_pieces))) * 450
+                        positional_balance -= len(list(filter(lambda p: p is not None and p.team == team, front_three_pieces))) * 300
                         other_defended_pieces_count -= len(piece.defended_by) * proportion
-                        other_defended_pieces_count += len(piece.attacked_by) * proportion + 0.1
+                        other_defended_pieces_count += len(piece.attacked_by) * proportion
                     else:
                         other_defended_pieces_count -= len(piece.defended_by) * proportion
-                        other_defended_pieces_count += len(piece.attacked_by) * proportion + 0.1
+                        other_defended_pieces_count += len(piece.attacked_by) * proportion
+
+                    if piece.attacked_by:
+                        attacked_by = []
+                        piece.attacked_by = list(filter(lambda pos: attacked_by.append(pos) if pos not in attacked_by else pos, piece.attacked_by))
+                        piece.attacked_by = attacked_by
+
+                        king_value = tables.centipawn_piece_dict['K']
+                        for pos in piece.attacked_by:
+                            net_value_defence_attack += king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
+
+                        piece.attacked_by.clear()
+
+                    if piece.defended_by:
+                        defended_by = []
+                        piece.defended_by = list(filter(lambda pos: defended_by.append(pos) if pos not in defended_by else pos, piece.defended_by))
+                        piece.defended_by = defended_by
+
+                        king_value = tables.centipawn_piece_dict['K']
+                        for pos in piece.attacked_by:
+                            net_value_defence_attack -= king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
+
+                        piece.defended_by.clear()
 
                     if 2 < col < 5:
                         if 2 < row < 5:
@@ -489,10 +533,8 @@ class Board:
         if self.position_in_check(team):
             positional_balance -= 300 * dead_pieces
 
-        scale = 500 if dead_pieces > 12 else 800 - (dead_pieces * 8) - (self.move_count * 3)
-
-        return material_balance + positional_balance + mobility_score + (defended_pawns_count * 5) + (
-                    other_defended_pieces_count * scale)
+        scale = 600 if dead_pieces > 12 else 1100 - (dead_pieces * 10) - (self.move_count * 6)
+        return material_balance + positional_balance + mobility_score + (defended_pawns_count * 5) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.0045)
 
     def search_game_tree(self, start_team, moves, game_boards):
         if moves == 0:
@@ -506,13 +548,14 @@ class Board:
                     for move in valid_moves:
                         temp_state = self.__deepcopy__()
                         temp_state.move_piece(row, col, move[0], move[1], start_team, True)
+                        temp_state.print_all_defending_attacking()
                         if moves == 1 and temp_state is not None:
                             game_boards.append(temp_state)
                         temp_state.search_game_tree(opponent_team, moves - 1, game_boards)
 
     def minimax(self, depth, team, maximiser, alpha=float('-inf'), beta=float('inf')):
         opposition_team = self.colors[(self.colors.index(team) + 1) % 2]
-        if depth == 0:
+        if depth == 0 or self is None:
             return self
 
         boards = []
@@ -608,6 +651,14 @@ class Board:
             col += 1
         self.import_board_row([row_string[i] for i in range(1, len(row_string))], row, col)
 
+    def print_all_defending_attacking(self):
+        for row in range(self.rows):
+            for col in range(self.rows):
+                piece = self.get_piece(row, col)
+                if piece is not None:
+                    piece.attacked_by.clear()
+                    piece.defended_by.clear()
+
 
 def differences_between_boards(b1, b2):
     differences = []
@@ -619,8 +670,8 @@ def differences_between_boards(b1, b2):
                 #  moved from row, col to somewhere
                 dest = b2.locate_piece(piece1)
                 differences.append([(row, col), (dest[0], dest[1])])
-            elif piece1 is not None and piece2 is not None and piece1.display_text != piece2.display_text:
-                pass
+            # elif piece1 is not None and piece2 is not None and piece1.display_text != piece2.display_text:
+            #     pass
                 # src = b1.locate_piece(piece2)
                 # differences.append(['X', (src[0], src[1]), (row, col)])
 
@@ -630,20 +681,19 @@ def differences_between_boards(b1, b2):
 def engine_play_engine(minimax_depth):
     board = Board()
     board.setup_pieces()
-    board.update_board_svg()
+    board.update_board_svg("board" + str(board.move_count) + ".svg")
 
     while not board.check_checkmate(board.colors[board.move_count % 2]) and board.fifty_move_count < 50:
 
-        next_board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True)
+        board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True)
 
-        if next_board is None:
+        if board is None:
             print('Stalemate')
             break
 
-        print(board.colors[board.move_count % 2] + "'s move. Move " + str(board.move_count) + ".")
-        board.update_board_svg("oldboard.svg")
-        next_board.update_board_svg()
-        board = next_board
+        print(board.colors[(board.move_count-1) % 2] + "'s move. Move " + str(board.move_count) + ".")
+        board.update_board_svg("board" + str(board.move_count) + ".svg")
+        board.print_all_defending_attacking()
 
     if board.fifty_move_count >= 50:
         print('Draw by 50 move rule')
@@ -653,6 +703,6 @@ def engine_play_engine(minimax_depth):
 
 if __name__ == "__main__":
 
-    engine_play_engine(3)
+    engine_play_engine(2)
 
     print('Done')
