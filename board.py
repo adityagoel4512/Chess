@@ -104,16 +104,13 @@ class Board:
         if piece.piece_type == 'P':
             self.fifty_move_count = 0
             if r2 == self.rows-1 or r2 == 0:
-                # Promotion
                 # TODO: pawn promotion as part of minimax not automatically choose highest value piece as done here
-
                 self.set_piece(r2, c2, chess_piece.Piece(team, 'Q', 4))
-                self.update_board_svg()
 
         self.move_count += 1
         piece.moved = True
 
-        return piece.moved
+        return True
 
     def setup_pieces(self):
         for i in range(self.rows):
@@ -297,9 +294,14 @@ class Board:
             # Disallow moves that result in check
             for row in range(r1 - 1, r1 + 2):
                 for col in range(c1 - 1, c1 + 2):
-                    if self.in_range(row, col) and (
-                            self.get_piece(row, col) is None or self.get_piece(row, col).team != piece.team):
-                        valid_moves.append([row, col])
+                    if self.in_range(row, col):
+                        temp_piece = self.get_piece(row, col)
+                        if temp_piece is None:
+                            valid_moves.append([row, col])
+                        elif temp_piece.team != piece.team:
+                            valid_moves.append([row, col])
+                            temp_piece.attacked_by.append([r1, c1])
+
 
             # Castling
             if piece.moved:
@@ -368,12 +370,11 @@ class Board:
         for row in range(self.rows):
             for col in range(self.rows):
                 piece = self.get_piece(row, col)
-                color_based_access = [[row, col], [self.rows - 1 - row, self.rows - 1 - col]] if team == 'W' else [
-                    [self.rows - 1 - row, self.rows - 1 - col], [row, col]]
+                color_based_access = [[row, col], [self.rows - 1 - row, self.rows - 1 - col]] if team == 'W' else [[self.rows - 1 - row, self.rows - 1 - col], [row, col]]
                 if piece is None:
                     pass
-                elif piece.team == team:
-
+                else:
+                    factor = -1 if piece.team != team else 1
                     material_balance += tables.centipawn_piece_dict[piece.piece_type]
                     positional_balance += tables.centipawn_position_dict[piece.piece_type][color_based_access[0][0]][color_based_access[0][1]]
                     proportion = tables.centipawn_piece_dict[piece.piece_type]*2 / tables.centipawn_piece_dict['Q'] if piece.piece_type != 'K' else 0.01
@@ -382,6 +383,8 @@ class Board:
                         other_defended_pieces_count += len(piece.defended_by) * proportion
                         other_defended_pieces_count -= len(piece.attacked_by) * proportion
                         bishop_count += 1
+                        if bishop_count == 2:
+                            material_balance += (bishop_count * 28)
                     elif piece.piece_type == 'P':
                         defended_pawns_count += len(piece.defended_by)
                     elif piece.piece_type == 'K':
@@ -422,6 +425,8 @@ class Board:
                         for pos in piece.attacked_by:
                             net_value_defence_attack -= king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
 
+                        net_value_defence_attack -= tables.centipawn_piece_dict[piece.piece_type]
+
                         piece.attacked_by.clear()
                     if piece.defended_by:
                         defended_by = []
@@ -442,79 +447,12 @@ class Board:
 
                     if piece.castled is not None and piece.castled:
                         positional_balance += 300
-                else:
 
-                    material_balance -= tables.centipawn_piece_dict[piece.piece_type]
-                    positional_balance -= tables.centipawn_position_dict[piece.piece_type][color_based_access[1][0]][color_based_access[1][1]]
-                    proportion = tables.centipawn_piece_dict[piece.piece_type] / tables.centipawn_piece_dict['Q'] if piece.piece_type != 'K' else 0.2
-
-                    if piece.piece_type == 'B':
-                        bishop_count -= 1
-                        other_defended_pieces_count -= len(piece.defended_by) * proportion
-                        other_defended_pieces_count += len(piece.attacked_by) * proportion
-                    elif piece.piece_type == 'P':
-                        defended_pawns_count -= len(piece.defended_by)
-                    elif piece.piece_type == 'K':
-                        # King protection
-                        flank_protection = [False, False]
-
-                        for i in range(col, self.rows):
-                            temp_piece = self.get_piece(row, i)
-                            if self.get_piece(row, i) is not None and temp_piece.team == team:
-                                flank_protection[1] = True
-                                break
-                        for i in range(0, col):
-                            temp_piece = self.get_piece(row, i)
-                            if self.get_piece(row, i) is not None and temp_piece.team == team:
-                                flank_protection[0] = True
-                                break
-
-                        positional_balance -= len(list(filter(lambda protected: protected, flank_protection))) * 125
-
-                        front_three_pieces = [self.get_piece(direction * 1 + row, col),
-                                              self.get_piece(direction * 1 + row, col + 1),
-                                              self.get_piece(direction * 1 + row, col - 1)]
-
-                        positional_balance -= len(list(filter(lambda p: p is not None and p.team == team, front_three_pieces))) * 300
-                        other_defended_pieces_count -= len(piece.defended_by) * proportion
-                        other_defended_pieces_count += len(piece.attacked_by) * proportion
-                    else:
-                        other_defended_pieces_count -= len(piece.defended_by) * proportion
-                        other_defended_pieces_count += len(piece.attacked_by) * proportion
-
-                    if piece.attacked_by:
-                        attacked_by = []
-                        piece.attacked_by = list(filter(lambda pos: attacked_by.append(pos) if pos not in attacked_by else pos, piece.attacked_by))
-                        piece.attacked_by = attacked_by
-
-                        king_value = tables.centipawn_piece_dict['K']
-                        for pos in piece.attacked_by:
-                            net_value_defence_attack += king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
-
-                        piece.attacked_by.clear()
-
-                    if piece.defended_by:
-                        defended_by = []
-                        piece.defended_by = list(filter(lambda pos: defended_by.append(pos) if pos not in defended_by else pos, piece.defended_by))
-                        piece.defended_by = defended_by
-
-                        king_value = tables.centipawn_piece_dict['K']
-                        for pos in piece.attacked_by:
-                            net_value_defence_attack -= king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
-
-                        piece.defended_by.clear()
-
-                    if 2 < col < 5:
-                        if 2 < row < 5:
-                            positional_balance -= 35
-                        elif 1 < row < 6:
-                            positional_balance -= 10
-
-                    if piece.castled is not None and piece.castled:
-                        positional_balance -= 300
-
-        if bishop_count == 2 or bishop_count == -2:
-            material_balance += (bishop_count * 25)
+                    material_balance *= factor
+                    positional_balance *= factor
+                    other_defended_pieces_count *= factor
+                    defended_pawns_count *= factor
+                    net_value_defence_attack *= factor
 
         # When to avoid, and when to play, for draw
 
@@ -533,7 +471,8 @@ class Board:
         if self.position_in_check(team):
             positional_balance -= 300 * dead_pieces
 
-        scale = 600 if dead_pieces > 12 else 1100 - (dead_pieces * 10) - (self.move_count * 6)
+        scale = 600 if dead_pieces > 12 else 1200 - (dead_pieces * 10) - (self.move_count * 6)
+
         return material_balance + positional_balance + mobility_score + (defended_pawns_count * 5) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.0045)
 
     def search_game_tree(self, start_team, moves, game_boards):
@@ -553,36 +492,44 @@ class Board:
                             game_boards.append(temp_state)
                         temp_state.search_game_tree(opponent_team, moves - 1, game_boards)
 
-    def minimax(self, depth, team, maximiser, alpha=float('-inf'), beta=float('inf')):
+    def minimax(self, depth, team, maximiser, alpha=float('-inf'), beta=float('inf'), shallow_move_ordering=False):
         opposition_team = self.colors[(self.colors.index(team) + 1) % 2]
         if depth == 0 or self is None:
             return self
 
         boards = []
         self.search_game_tree(team, 1, boards)
+        boards = list(filter(lambda board: board is not None, boards))
         max_value = float('-inf')
         max_board = None
 
+        if shallow_move_ordering:
+            boards.sort(key=lambda board: board.evaluate_score(team), reverse=True)
+
         if maximiser:
+
             for board in boards:
                 minimax_board = board.minimax(depth - 1, opposition_team, not maximiser, alpha, beta)
-                board_score = minimax_board.evaluate_score(team)
-                if board_score > max_value:
-                    max_value = board_score
-                    max_board = board
-                alpha = max(alpha, max_value)
-                if beta <= alpha:
-                    break
+                if minimax_board is not None:
+                    board_score = minimax_board.evaluate_score(team)
+                    if board_score > max_value:
+                        max_value = board_score
+                        max_board = board
+                    alpha = max(alpha, max_value)
+                    if beta <= alpha:
+                        break
         else:
+
             for board in boards:
                 minimax_board = board.minimax(depth - 1, opposition_team, not maximiser, alpha, beta)
-                board_score = minimax_board.evaluate_score(team)
-                if board_score > max_value:
-                    max_value = board_score
-                    max_board = minimax_board
-                beta = min(beta, max_value)
-                if beta <= alpha:
-                    break
+                if minimax_board is not None:
+                    board_score = minimax_board.evaluate_score(team)
+                    if board_score > max_value:
+                        max_value = board_score
+                        max_board = minimax_board
+                    beta = min(beta, max_value)
+                    if beta <= alpha:
+                        break
 
         return max_board
 
