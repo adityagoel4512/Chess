@@ -24,7 +24,7 @@ def engine_play_engine(minimax_depth):
     if board.fifty_move_count >= 50:
         print('Draw by 50 move rule')
     else:
-        print(board.colors[(board.move_count + 1) % 2] + " wins!")
+        print(board.colors[board.move_count% 2] + " wins!")
 
 
 def human_play_engine(minimax_depth, team='W'):
@@ -57,7 +57,7 @@ def human_play_engine(minimax_depth, team='W'):
     if board.fifty_move_count >= 50:
         print('Draw by 50 move rule')
     else:
-        print(board.colors[(board.move_count + 1) % 2] + " wins!")
+        print(board.colors[board.move_count % 2] + " wins!")
 
 
 if __name__ == "__main__":
