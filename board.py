@@ -348,12 +348,8 @@ class Board:
         self.search_game_tree(team, 1, further_moves)
         mobility_score = len(further_moves) * 3
 
-        material_balance = 0
-        positional_balance = 0
+        material_balance, positional_balance, defended_pawns_count, other_defended_pieces_count, net_value_defence_attack = 0, 0, 0, 0, 0
         bishop_count = {team: 0, opposition: 0}
-        defended_pawns_count = 0
-        other_defended_pieces_count = 0
-        net_value_defence_attack = 0
 
         # If black piece table needs to be vertically reflected and horizontally reflected
         direction = 1 if team == 'W' else 1
@@ -365,12 +361,7 @@ class Board:
                 if piece is None:
                     pass
                 else:
-                    piece_material_balance = 0
-                    piece_positional_balance = 0
-                    piece_defended_pawns_count = 0
-                    piece_other_defended_pieces_count = 0
-                    piece_net_value_defence_attack = 0
-
+                    piece_material_balance, piece_positional_balance, piece_defended_pawns_count, piece_other_defended_pieces_count, piece_net_value_defence_attack = 0, 0, 0, 0, 0
                     piece_material_balance += tables.centipawn_piece_dict[piece.piece_type]
                     piece_positional_balance += tables.centipawn_position_dict[piece.piece_type][color_based_access[0][0]][color_based_access[0][1]]
                     proportion = tables.centipawn_piece_dict[piece.piece_type]*2 / tables.centipawn_piece_dict['Q'] if piece.piece_type != 'K' else 0.01
