@@ -406,8 +406,8 @@ class Board:
 
                         piece_positional_balance += len(list(filter(lambda protected: protected, flank_protection))) * 125
 
-                        front_three_pieces = [self.get_piece(direction * 1 + row, col),
-                                              self.get_piece(direction * 1 + row, col - 1),
+                        front_three_pieces = [self.get_piece(direction * 1 + row, col - 1),
+                                              self.get_piece(direction * 1 + row, col),
                                               self.get_piece(direction * 1 + row, col + 1)]
 
                         piece_positional_balance += len(list(filter(lambda p: p is not None and p.team == team, front_three_pieces))) * 300
@@ -490,7 +490,7 @@ class Board:
                     for move in valid_moves:
                         temp_state = self.__deepcopy__()
                         temp_state.move_piece(row, col, move[0], move[1], start_team, True)
-                        temp_state.print_all_defending_attacking()
+                        temp_state.clear_all_defending_attacking()
                         if moves == 1 and temp_state is not None:
                             game_boards.append(temp_state)
                         temp_state.search_game_tree(opponent_team, moves - 1, game_boards)
@@ -601,7 +601,7 @@ class Board:
             col += 1
         self.import_board_row([row_string[i] for i in range(1, len(row_string))], row, col)
 
-    def print_all_defending_attacking(self):
+    def clear_all_defending_attacking(self):
         for row in range(self.rows):
             for col in range(self.rows):
                 piece = self.get_piece(row, col)
@@ -633,7 +633,7 @@ def engine_play_engine(minimax_depth):
     board.setup_pieces()
     board.update_board_svg("board" + str(board.move_count) + ".svg")
 
-    while not board.check_checkmate(board.colors[board.move_count % 2]) and board.fifty_move_count < 50:
+    while not board.check_checkmate(board.colors[(board.move_count-1) % 2]) and board.fifty_move_count < 50:
 
         board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True)
 
@@ -643,12 +643,45 @@ def engine_play_engine(minimax_depth):
 
         print(board.colors[(board.move_count-1) % 2] + "'s move. Move " + str(board.move_count) + " at " + str(datetime.datetime.now()) + ".")
         board.update_board_svg("board" + str(board.move_count) + ".svg")
-        board.print_all_defending_attacking()
+        board.clear_all_defending_attacking()
 
     if board.fifty_move_count >= 50:
         print('Draw by 50 move rule')
     else:
         print(board.colors[(board.move_count + 1) % 2] + " wins!")
+
+def human_play_engine(minimax_depth, team='W'):
+    board = Board()
+    board.setup_pieces()
+
+    print('You are ' + team)
+
+    board.update_board_svg("board" + str(board.move_count) + ".svg")
+
+    player = board.colors.index(team)
+    while not board.check_checkmate(board.colors[(board.move_count-1) % 2]) and board.fifty_move_count < 50:
+
+        if (board.move_count-1) % 2 == player:
+            r1, c1, r2, c2 = input('Enter move in format r1, c1, r2, c2')
+            while not board.move_piece(r1, c1, r2, c2, team, True):
+                print('Invalid Move')
+                r1, c1, r2, c2 = input('Enter move in format r1, c1, r2, c2')
+        else:
+            board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True)
+
+        if board is None:
+            print('Stalemate')
+            break
+
+        print(board.colors[(board.move_count-1) % 2] + "'s move. Move " + str(board.move_count) + " at " + str(datetime.datetime.now()) + ".")
+        board.update_board_svg("board" + str(board.move_count) + ".svg")
+        board.clear_all_defending_attacking()
+
+    if board.fifty_move_count >= 50:
+        print('Draw by 50 move rule')
+    else:
+        print(board.colors[(board.move_count + 1) % 2] + " wins!")
+
 
 
 if __name__ == "__main__":
