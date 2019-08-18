@@ -2,8 +2,6 @@ import piece as chess_piece
 import piece_square_tables as tables
 import chess
 import chess.svg
-import functools
-import datetime
 
 
 class Board:
@@ -12,7 +10,7 @@ class Board:
     colors = ['W', 'B']
     pieces = ['P', 'R', 'N', 'B', 'Q', 'K']
 
-    def __init__(self, grid=None, king_pos=[[7, 4], [0, 4]], move_count=0,
+    def __init__(self, grid=None, king_pos={'W': [7, 4], 'B': [0, 4]}, move_count=0,
                  can_castle={'W': [False, False], 'B': [False, False]},
                  dead_pieces={'W': [], 'B': []},
                  fifty_move_count=0):
@@ -42,7 +40,8 @@ class Board:
                 else:
                     copy_grid[row].append([self.grid[row][col][0], None])
 
-        copy_king_pos = list(map(lambda pos: [pos[0], pos[1]], self.king_pos))
+        copy_king_pos = {'W': list(map(lambda pos: pos, self.king_pos['W'])),
+                         'B': list(map(lambda pos: pos, self.king_pos['B']))}
         copy_can_castle = {'W': list(map(lambda castle: castle, self.can_castle['W'])),
                            'B': list(map(lambda castle: castle, self.can_castle['B']))}
         copy_dead_pieces = {'W': list(map(lambda piece: piece.__copy__(), self.dead_pieces['W'])),
@@ -67,13 +66,12 @@ class Board:
     def set_piece(self, row, column, piece):
         assert (self.in_range(row, column))
         if piece is not None and piece.piece_type == 'K':
-            self.king_pos[self.colors.index(piece.team)] = [row, column]
+            self.king_pos[piece.team] = [row, column]
         self.grid[row][column][1] = piece
 
     def move_piece(self, r1, c1, r2, c2, team, filter_check_moves):
         piece = self.get_piece(r1, c1)
         valid_moves = self.compute_valid_moves(r1, c1, team, filter_check_moves)
-
 
         if not [r2, c2] in valid_moves:
             return False
@@ -146,9 +144,8 @@ class Board:
         return [-1, -1]
 
     def position_in_check(self, side):
-        i = self.colors.index(side)
-        r1 = self.king_pos[i][0]
-        c1 = self.king_pos[i][1]
+        r1 = self.king_pos[side][0]
+        c1 = self.king_pos[side][1]
 
         king_piece = self.get_piece(r1, c1)
 
@@ -167,9 +164,8 @@ class Board:
         return False
 
     def check_checkmate(self, side):
-        i = self.colors.index(side)
-        r1 = self.king_pos[i][0]
-        c1 = self.king_pos[i][1]
+        r1 = self.king_pos[side][0]
+        c1 = self.king_pos[side][1]
 
         king = self.get_piece(r1, c1)
         if king is None:
@@ -208,6 +204,7 @@ class Board:
         return temp_state.in_range(move[0], move[1]) and temp_state.position_in_check(piece.team)
 
     def compute_valid_moves(self, r1, c1, team, filter_check_moves):
+        # Filter check moves imposes recursion depth also
         piece = self.get_piece(r1, c1)
         valid_moves = []
 
@@ -302,7 +299,6 @@ class Board:
                             valid_moves.append([row, col])
                             temp_piece.attacked_by.append([r1, c1])
 
-
             # Castling management
             if piece.moved:
                 self.can_castle[team] = [False, False]
@@ -347,9 +343,6 @@ class Board:
 
         if self.check_checkmate(opposition):
             return float('inf')
-
-        # if self.check_checkmate(team):
-        #     return float('-inf')
 
         further_moves = []
         self.search_game_tree(team, 1, further_moves)
@@ -477,7 +470,7 @@ class Board:
 
         scale = 600 if dead_pieces > 12 else 1200 - (dead_pieces * 10) - (self.move_count * 6)
 
-        return material_balance + positional_balance + mobility_score + (defended_pawns_count * 5) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.0045)
+        return 1.5*material_balance + positional_balance + mobility_score + (defended_pawns_count * 5) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.0045)
 
     def search_game_tree(self, start_team, moves, game_boards):
         if moves == 0:
@@ -611,82 +604,7 @@ class Board:
                     piece.defended_by.clear()
 
 
-def differences_between_boards(b1, b2):
-    differences = []
-    for row in range(b2.rows):
-        for col in range(b2.rows):
-            piece2 = b2.get_piece(row, col)
-            piece1 = b1.get_piece(row, col)
-            if piece1 is not None and piece2 is None:
-                #  moved from row, col to somewhere
-                dest = b2.locate_piece(piece1)
-                differences.append([(row, col), (dest[0], dest[1])])
-            # elif piece1 is not None and piece2 is not None and piece1.display_text != piece2.display_text:
-            #     pass
-                # src = b1.locate_piece(piece2)
-                # differences.append(['X', (src[0], src[1]), (row, col)])
-
-    return differences
-
-
-def engine_play_engine(minimax_depth):
-    board = Board()
-    board.setup_pieces()
-    board.update_board_svg("board" + str(board.move_count) + ".svg")
-
-    while not board.check_checkmate(board.colors[(board.move_count-1) % 2]) and board.fifty_move_count < 50:
-
-        board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True)
-
-        if board is None:
-            print('Stalemate')
-            break
-
-        print(board.colors[(board.move_count-1) % 2] + "'s move. Move " + str(board.move_count) + " at " + str(datetime.datetime.now()) + ".")
-        board.update_board_svg("board" + str(board.move_count) + ".svg")
-        board.clear_all_defending_attacking()
-
-    if board.fifty_move_count >= 50:
-        print('Draw by 50 move rule')
-    else:
-        print(board.colors[(board.move_count + 1) % 2] + " wins!")
-
-def human_play_engine(minimax_depth, team='W'):
-    board = Board()
-    board.setup_pieces()
-
-    print('You are ' + team)
-
-    board.update_board_svg("board" + str(board.move_count) + ".svg")
-
-    player = board.colors.index(team)
-    while not board.check_checkmate(board.colors[(board.move_count-1) % 2]) and board.fifty_move_count < 50:
-
-        if board.move_count % 2 == player:
-            r1, c1, r2, c2 = input('Enter move in format r1, c1, r2, c2').split()
-            while not board.move_piece(int(r1), int(c1), int(r2), int(c2), team, True):
-                print('Invalid Move')
-                r1, c1, r2, c2 = input('Enter move in format r1, c1, r2, c2').split()
-        else:
-            board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True)
-
-        if board is None:
-            print('Stalemate')
-            break
-
-        print(board.colors[(board.move_count-1) % 2] + "'s move. Move " + str(board.move_count) + " at " + str(datetime.datetime.now()) + ".")
-        board.update_board_svg("board" + str(board.move_count) + ".svg")
-        board.clear_all_defending_attacking()
-
-    if board.fifty_move_count >= 50:
-        print('Draw by 50 move rule')
-    else:
-        print(board.colors[(board.move_count + 1) % 2] + " wins!")
 
 
 
-if __name__ == "__main__":
 
-    human_play_engine(2, 'W')
-
-    print('Done')

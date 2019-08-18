@@ -61,6 +61,6 @@ king_midgame_table = [[-30, -40, -40, -50, -50, -40, -40, -30],
 #                       [-30,-30,  0,  0,  0,  0,-30,-30],
 #                       [-50,-30,-30,-30,-30,-30,-30,-50]]
 
-centipawn_piece_dict = {'P': 400, 'N': 4750, 'B': 6000, 'R': 6500, 'Q': 15000, 'K': 100000}
+centipawn_piece_dict = {'P': 500, 'N': 5000, 'B': 6500, 'R': 7000, 'Q': 15250, 'K': 100000}
 centipawn_position_dict = {'P': pawn_table, 'N': knight_table, 'B': bishop_table, 'R': rook_table,
                             'Q': queen_table, 'K': king_midgame_table}
