@@ -74,7 +74,8 @@ class Board:
         piece = self.get_piece(r1, c1)
         valid_moves = self.compute_valid_moves(r1, c1, team, filter_check_moves)
 
-        if not filter(lambda move: move == [r2, c2], valid_moves):
+
+        if not [r2, c2] in valid_moves:
             return False
 
         self.fifty_move_count += 1
@@ -661,11 +662,11 @@ def human_play_engine(minimax_depth, team='W'):
     player = board.colors.index(team)
     while not board.check_checkmate(board.colors[(board.move_count-1) % 2]) and board.fifty_move_count < 50:
 
-        if (board.move_count-1) % 2 == player:
-            r1, c1, r2, c2 = input('Enter move in format r1, c1, r2, c2')
-            while not board.move_piece(r1, c1, r2, c2, team, True):
+        if board.move_count % 2 == player:
+            r1, c1, r2, c2 = input('Enter move in format r1, c1, r2, c2').split()
+            while not board.move_piece(int(r1), int(c1), int(r2), int(c2), team, True):
                 print('Invalid Move')
-                r1, c1, r2, c2 = input('Enter move in format r1, c1, r2, c2')
+                r1, c1, r2, c2 = input('Enter move in format r1, c1, r2, c2').split()
         else:
             board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True)
 
@@ -686,6 +687,6 @@ def human_play_engine(minimax_depth, team='W'):
 
 if __name__ == "__main__":
 
-    engine_play_engine(2)
+    human_play_engine(2, 'W')
 
     print('Done')
