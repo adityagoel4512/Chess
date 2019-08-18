@@ -360,7 +360,7 @@ class Board:
 
         material_balance = 0
         positional_balance = 0
-        bishop_count = 0
+        bishop_count = {team: 0, opposition: 0}
         defended_pawns_count = 0
         other_defended_pieces_count = 0
         net_value_defence_attack = 0
@@ -390,9 +390,9 @@ class Board:
                     if piece.piece_type == 'B':
                         piece_other_defended_pieces_count += len(piece.defended_by) * proportion
                         piece_other_defended_pieces_count -= len(piece.attacked_by) * proportion
-                        # bishop_count += 1
-                        # if bishop_count == 2:
-                        #     material_balance += (bishop_count * 28)
+                        bishop_count[piece.team] += 1
+                        if bishop_count[piece.team] == 2:
+                            material_balance += 60
                     elif piece.piece_type == 'P':
                         piece_defended_pawns_count += len(piece.defended_by)
                     elif piece.piece_type == 'K':
