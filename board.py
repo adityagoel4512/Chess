@@ -146,7 +146,6 @@ class Board:
     def position_in_check(self, side):
         r1 = self.king_pos[side][0]
         c1 = self.king_pos[side][1]
-
         king_piece = self.get_piece(r1, c1)
 
         if king_piece is None:
@@ -164,11 +163,8 @@ class Board:
         return False
 
     def check_checkmate(self, side):
-        r1 = self.king_pos[side][0]
-        c1 = self.king_pos[side][1]
-
-        king = self.get_piece(r1, c1)
-        if king is None:
+        king_piece = self.get_piece(self.king_pos[side][0], self.king_pos[side][1])
+        if king_piece is None:
             return True
 
         if not self.position_in_check(side):
@@ -176,7 +172,7 @@ class Board:
         for row in range(self.rows):
             for col in range(self.rows):
                 piece = self.get_piece(row, col)
-                if piece is not None and piece.team == king.team:
+                if piece is not None and piece.team == king_piece.team:
                     moves = self.compute_valid_moves(row, col, piece.team, False)
                     for move in moves:
                         temp_state = self.__deepcopy__()
@@ -495,9 +491,8 @@ class Board:
             boards.sort(key=lambda board: board.evaluate_score(team), reverse=True)
 
         if maximiser:
-
             for board in boards:
-                minimax_board = board.minimax(depth - 1, opposition_team, not maximiser, alpha, beta)
+                minimax_board = board.minimax(depth - 1, opposition_team, False, alpha, beta)
                 if minimax_board is not None:
                     board_score = minimax_board.evaluate_score(team)
                     if board_score > max_value:
@@ -507,9 +502,8 @@ class Board:
                     if beta <= alpha:
                         break
         else:
-
             for board in boards:
-                minimax_board = board.minimax(depth - 1, opposition_team, not maximiser, alpha, beta)
+                minimax_board = board.minimax(depth - 1, opposition_team, True, alpha, beta)
                 if minimax_board is not None:
                     board_score = minimax_board.evaluate_score(team)
                     if board_score > max_value:
@@ -553,6 +547,10 @@ class Board:
             if row < self.rows - 1:
                 board_string += "/"
 
+        # Prints board string if we want to reconstruct this board state at a seperate point with import_board.
+        # Only encodes the way the board is represented and not advanced features for chess engine
+        # Assumes white is next to play
+
         print(board_string)
         return board_string
 
@@ -564,13 +562,14 @@ class Board:
         svg_file.close()
 
     def import_board(self, board_string):
+        # Pre: assumes board_string well formed.
+        # Format is the same as the Python Chess library.
         board_string = board_string.split('/')
         for row in range(len(board_string)):
             row_string = list(board_string[row])
             self.import_board_row(row_string, row)
 
     def import_board_row(self, row_string, row, col=0):
-        # Pre: assumes board_string well formed.
         if not row_string:
             return
         if row_string[0].isdigit():
