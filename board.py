@@ -3,6 +3,7 @@ import piece_square_tables as tables
 import chess
 import chess.svg
 import functools
+import datetime
 
 
 class Board:
@@ -375,18 +376,25 @@ class Board:
                     pass
                 else:
                     factor = -1 if piece.team != team else 1
-                    material_balance += tables.centipawn_piece_dict[piece.piece_type]
-                    positional_balance += tables.centipawn_position_dict[piece.piece_type][color_based_access[0][0]][color_based_access[0][1]]
+
+                    piece_material_balance = 0
+                    piece_positional_balance = 0
+                    piece_defended_pawns_count = 0
+                    piece_other_defended_pieces_count = 0
+                    piece_net_value_defence_attack = 0
+
+                    piece_material_balance += tables.centipawn_piece_dict[piece.piece_type]
+                    piece_positional_balance += tables.centipawn_position_dict[piece.piece_type][color_based_access[0][0]][color_based_access[0][1]]
                     proportion = tables.centipawn_piece_dict[piece.piece_type]*2 / tables.centipawn_piece_dict['Q'] if piece.piece_type != 'K' else 0.01
 
                     if piece.piece_type == 'B':
-                        other_defended_pieces_count += len(piece.defended_by) * proportion
-                        other_defended_pieces_count -= len(piece.attacked_by) * proportion
-                        bishop_count += 1
-                        if bishop_count == 2:
-                            material_balance += (bishop_count * 28)
+                        piece_other_defended_pieces_count += len(piece.defended_by) * proportion
+                        piece_other_defended_pieces_count -= len(piece.attacked_by) * proportion
+                        # bishop_count += 1
+                        # if bishop_count == 2:
+                        #     material_balance += (bishop_count * 28)
                     elif piece.piece_type == 'P':
-                        defended_pawns_count += len(piece.defended_by)
+                        piece_defended_pawns_count += len(piece.defended_by)
                     elif piece.piece_type == 'K':
                         # King protection
                         flank_protection = [False, False]
@@ -402,19 +410,19 @@ class Board:
                                 flank_protection[0] = True
                                 break
 
-                        positional_balance += len(list(filter(lambda protected: protected, flank_protection))) * 125
+                        piece_positional_balance += len(list(filter(lambda protected: protected, flank_protection))) * 125
 
                         front_three_pieces = [self.get_piece(direction * 1 + row, col),
                                               self.get_piece(direction * 1 + row, col - 1),
                                               self.get_piece(direction * 1 + row, col + 1)]
 
-                        positional_balance += len(list(filter(lambda p: p is not None and p.team == team, front_three_pieces))) * 300
-                        other_defended_pieces_count += len(piece.defended_by) * proportion
-                        other_defended_pieces_count -= len(piece.attacked_by) * proportion
+                        piece_positional_balance += len(list(filter(lambda p: p is not None and p.team == team, front_three_pieces))) * 300
+                        piece_other_defended_pieces_count += len(piece.defended_by) * proportion
+                        piece_other_defended_pieces_count -= len(piece.attacked_by) * proportion
 
                     else:
-                        other_defended_pieces_count += len(piece.defended_by) * proportion
-                        other_defended_pieces_count -= len(piece.attacked_by) * proportion
+                        piece_other_defended_pieces_count += len(piece.defended_by) * proportion
+                        piece_other_defended_pieces_count -= len(piece.attacked_by) * proportion
 
                     if piece.attacked_by:
                         attacked_by = []
@@ -423,11 +431,11 @@ class Board:
 
                         king_value = tables.centipawn_piece_dict['K']
                         for pos in piece.attacked_by:
-                            net_value_defence_attack -= king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
+                            piece_net_value_defence_attack -= king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
 
-                        net_value_defence_attack -= tables.centipawn_piece_dict[piece.piece_type]
-
+                        piece_net_value_defence_attack -= tables.centipawn_piece_dict[piece.piece_type]
                         piece.attacked_by.clear()
+
                     if piece.defended_by:
                         defended_by = []
                         piece.defended_by = list(filter(lambda pos: defended_by.append(pos) if pos not in defended_by else pos, piece.defended_by))
@@ -435,7 +443,7 @@ class Board:
 
                         king_value = tables.centipawn_piece_dict['K']
                         for pos in piece.attacked_by:
-                            net_value_defence_attack += king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
+                            piece_net_value_defence_attack += king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
 
                         piece.defended_by.clear()
 
@@ -446,13 +454,13 @@ class Board:
                             positional_balance += 10
 
                     if piece.castled is not None and piece.castled:
-                        positional_balance += 300
+                        piece_positional_balance += 300
 
-                    material_balance *= factor
-                    positional_balance *= factor
-                    other_defended_pieces_count *= factor
-                    defended_pawns_count *= factor
-                    net_value_defence_attack *= factor
+                    material_balance += piece_material_balance * factor
+                    positional_balance += piece_positional_balance * factor
+                    other_defended_pieces_count += piece_other_defended_pieces_count * factor
+                    defended_pawns_count += piece_defended_pawns_count * factor
+                    net_value_defence_attack += piece_net_value_defence_attack * factor
 
         # When to avoid, and when to play, for draw
 
@@ -638,7 +646,7 @@ def engine_play_engine(minimax_depth):
             print('Stalemate')
             break
 
-        print(board.colors[(board.move_count-1) % 2] + "'s move. Move " + str(board.move_count) + ".")
+        print(board.colors[(board.move_count-1) % 2] + "'s move. Move " + str(board.move_count) + " at " + str(datetime.datetime.now()) + ".")
         board.update_board_svg("board" + str(board.move_count) + ".svg")
         board.print_all_defending_attacking()
 
