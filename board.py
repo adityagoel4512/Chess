@@ -1,5 +1,5 @@
 import piece as chess_piece
-import piece_square_tables as tables
+import piecesquaretables as tables
 import chess
 import chess.svg
 
@@ -404,7 +404,7 @@ class Board:
                         piece.attacked_by = list(filter(lambda pos: attacked_by.append(pos) if pos not in attacked_by else pos, piece.attacked_by))
                         piece.attacked_by = attacked_by
 
-                        king_value = tables.centipawn_piece_dict['K']
+                        king_value = tables.centipawn_piece_dict['K'] + 300
                         for pos in piece.attacked_by:
                             piece_net_value_defence_attack -= king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
 
@@ -416,7 +416,7 @@ class Board:
                         piece.defended_by = list(filter(lambda pos: defended_by.append(pos) if pos not in defended_by else pos, piece.defended_by))
                         piece.defended_by = defended_by
 
-                        king_value = tables.centipawn_piece_dict['K']
+                        king_value = tables.centipawn_piece_dict['K'] + 300
                         for pos in piece.attacked_by:
                             piece_net_value_defence_attack += king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
 
@@ -554,8 +554,11 @@ class Board:
         print(board_string)
         return board_string
 
-    def update_board_svg(self, filename="board.svg"):
-        board = chess.Board(self.export_board_string())
+    def update_board_svg(self, filename="board.svg", board_string = None):
+        if board_string is None:
+            board_string = self.export_board_string()
+
+        board = chess.Board(board_string)
         svg_text = chess.svg.board(board)
         svg_file = open(filename, "w")
         svg_file.write(svg_text)
