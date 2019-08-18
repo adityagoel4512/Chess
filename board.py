@@ -218,7 +218,7 @@ class Board:
         if piece.piece_type == 'P':
             if self.get_piece(r1 + (direction * 1), c1) is None:
                 valid_moves.append([r1 + (direction * 1), c1])
-                if not piece.moved and self.get_piece(r1 + (direction * 2), c1) is None and self:
+                if not piece.moved and self.get_piece(r1 + (direction * 2), c1) is None:
                     valid_moves.append([r1 + (direction * 2), c1])
 
             top_right = self.get_piece(r1 + (direction * 1), c1 + 1)
@@ -242,9 +242,7 @@ class Board:
 
             for sign in signs:
                 i = 1
-                while self.in_range(r1 + (sign[0] * i), c1 + (sign[1] * i)) and self.get_piece(r1 + (sign[0] * i),
-                                                                                               c1 + (sign[
-                                                                                                         1] * i)) is None:
+                while self.in_range(r1 + (sign[0] * i), c1 + (sign[1] * i)) and self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)) is None:
                     valid_moves.append([r1 + (sign[0] * i), c1 + (sign[1] * i)])
                     i += 1
                 if self.in_range(r1 + (sign[0] * i), c1 + (sign[1] * i)):
@@ -304,7 +302,7 @@ class Board:
                             temp_piece.attacked_by.append([r1, c1])
 
 
-            # Castling
+            # Castling management
             if piece.moved:
                 self.can_castle[team] = [False, False]
             else:
@@ -315,8 +313,7 @@ class Board:
                         self.can_castle[team][1] = False
                         pass
                 far_right_piece = self.get_piece(r1, self.rows - 1)
-                self.can_castle[team][1] = self.can_castle[team][
-                                               1] and far_right_piece is not None and far_right_piece.piece_type == 'R' and far_right_piece.team == team and not far_right_piece.moved
+                self.can_castle[team][1] = self.can_castle[team][1] and far_right_piece is not None and far_right_piece.piece_type == 'R' and far_right_piece.team == team and not far_right_piece.moved
                 # Queen side
                 for col in range(1, c1):
                     if self.get_piece(r1, col) is not None:
@@ -344,7 +341,6 @@ class Board:
 
         # TODO: Passed pawns, King Safety and Pawn Structure.
         # TODO: pawn rams, pawn levers, duo trio quart
-        # TODO: open files next to king
 
         opposition = self.colors[(self.colors.index(team) + 1) % 2]
 
@@ -375,8 +371,6 @@ class Board:
                 if piece is None:
                     pass
                 else:
-                    factor = -1 if piece.team != team else 1
-
                     piece_material_balance = 0
                     piece_positional_balance = 0
                     piece_defended_pawns_count = 0
@@ -456,6 +450,7 @@ class Board:
                     if piece.castled is not None and piece.castled:
                         piece_positional_balance += 300
 
+                    factor = -1 if piece.team != team else 1
                     material_balance += piece_material_balance * factor
                     positional_balance += piece_positional_balance * factor
                     other_defended_pieces_count += piece_other_defended_pieces_count * factor
@@ -470,7 +465,7 @@ class Board:
             else:
                 positional_balance += 2000
 
-        # Go for check towards end:
+        # Go for check, especially towards end:
 
         dead_pieces = len(self.dead_pieces['W']) + len(self.dead_pieces['B'])
 
