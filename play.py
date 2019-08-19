@@ -1,3 +1,4 @@
+import sys
 import datetime
 import board as chessboard
 
@@ -68,6 +69,16 @@ def human_play_engine(minimax_depth, team='W'):
 
 
 if __name__ == "__main__":
-    # human_play_engine(2, 'B')
-    engine_play_engine(2)
+
+    player = len(sys.argv)
+    minimax_depth = int(sys.argv[1])
+
+    if player == 3:
+        team = str(sys.argv[2])
+        human_play_engine(minimax_depth, team)
+    elif player == 2:
+        engine_play_engine(minimax_depth)
+    else:
+        print("See program spec for how to structure command line arguments")
+
     print('Done')

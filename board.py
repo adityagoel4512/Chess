@@ -2,7 +2,6 @@ import piece as chess_piece
 import piecesquaretables as tables
 import chess
 import chess.svg
-import utils
 
 
 class Board:
@@ -369,6 +368,13 @@ class Board:
                         bishop_count[piece.team] += 1
                         if bishop_count[piece.team] == 2:
                             material_balance += 60
+                    elif piece.piece_type == 'R':
+                        piece_other_defended_pieces_count += len(piece.defended_by) * proportion
+                        piece_other_defended_pieces_count -= len(piece.attacked_by) * proportion
+                        for i in range(row, self.rows):
+                            if self.get_piece(i, col) is None:
+                                piece_positional_balance += 20
+
                     elif piece.piece_type == 'P':
                         piece_defended_pawns_count += len(piece.defended_by)
                     elif piece.piece_type == 'K':
@@ -409,7 +415,7 @@ class Board:
                         for pos in piece.attacked_by:
                             piece_net_value_defence_attack -= king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
 
-                        piece_net_value_defence_attack -= tables.centipawn_piece_dict[piece.piece_type]
+                        piece_net_value_defence_attack -= tables.centipawn_piece_dict[piece.piece_type] * 1.2
                         piece.attacked_by.clear()
 
                     if piece.defended_by:
@@ -436,7 +442,7 @@ class Board:
                     material_balance += piece_material_balance * factor
                     positional_balance += piece_positional_balance * factor
                     other_defended_pieces_count += piece_other_defended_pieces_count * factor
-                    defended_pawns_count += piece_defended_pawns_count * factor
+                    defended_pawns_count += 1.2 * piece_defended_pawns_count * factor
                     net_value_defence_attack += piece_net_value_defence_attack * factor
 
         # When to avoid, and when to play, for draw
@@ -458,7 +464,7 @@ class Board:
 
         scale = 600 if dead_pieces > 12 else 1200 - (dead_pieces * 10) - (self.move_count * 6)
 
-        return 1.5*material_balance + positional_balance + mobility_score + (defended_pawns_count * 5) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.0045)
+        return 1.5*material_balance + positional_balance + mobility_score + (defended_pawns_count * 5) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.045)
 
     def search_game_tree(self, start_team, moves, game_boards):
         if moves == 0:
@@ -477,16 +483,14 @@ class Board:
                             game_boards.append(temp_state)
                         temp_state.search_game_tree(opponent_team, moves - 1, game_boards)
 
-    def quiescent_search(self, team, leaf_board):
-        opposition_team = self.colors[(self.colors.index(team) + 1) % 2]
-        if len(self.dead_pieces[opposition_team]) > len(leaf_board.dead_pieces[opposition_team]):
-            boards = []
-            self.search_game_tree(team, 1, boards)
-            for board in boards:
-                if board is not None:
-                    board.quiescent_search(opposition_team, self)
-
-        return self.evaluate_score(team)
+    def number_of_pieces(self, piece_type, team):
+        count = 0
+        for row in range(self.rows):
+            for col in range(self.rows):
+                piece = self.get_piece(row, col)
+                if piece is not None and piece.display_text == team + piece_type:
+                    count += 1
+        return count
 
     def minimax(self, depth, team, maximiser, original_board, alpha=float('-inf'), beta=float('inf'), shallow_move_ordering=False, quiescent=False):
         if self is None:
@@ -498,10 +502,10 @@ class Board:
             # Q-searches are usually not depth-limited, and instead rely on the tree terminating. Trees will
             # always terminate (usually reasonably quickly) since the number of possible captures are usually
             # limited, and tend to decrease as captures are made.
-
-            if not quiescent and len(self.dead_pieces[opposition_team]) > len(original_board.dead_pieces[opposition_team]):
+            #
+            if not quiescent and (len(self.dead_pieces[opposition_team]) > len(original_board.dead_pieces[opposition_team]) or self.number_of_pieces('Q', team) > 1):
                 # Pieces have been captured
-                # Quiescent search
+                # Quiescent search of just one further ply
                 return self.minimax(1, opposition_team, not maximiser, self, alpha, beta, shallow_move_ordering, True)
 
             return self
