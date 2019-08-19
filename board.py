@@ -2,6 +2,7 @@ import piece as chess_piece
 import piecesquaretables as tables
 import chess
 import chess.svg
+import utils
 
 
 class Board:
@@ -476,9 +477,33 @@ class Board:
                             game_boards.append(temp_state)
                         temp_state.search_game_tree(opponent_team, moves - 1, game_boards)
 
-    def minimax(self, depth, team, maximiser, alpha=float('-inf'), beta=float('inf'), shallow_move_ordering=False):
+    def quiescent_search(self, team, leaf_board):
         opposition_team = self.colors[(self.colors.index(team) + 1) % 2]
-        if depth == 0 or self is None:
+        if len(self.dead_pieces[opposition_team]) > len(leaf_board.dead_pieces[opposition_team]):
+            boards = []
+            self.search_game_tree(team, 1, boards)
+            for board in boards:
+                if board is not None:
+                    board.quiescent_search(opposition_team, self)
+
+        return self.evaluate_score(team)
+
+    def minimax(self, depth, team, maximiser, original_board, alpha=float('-inf'), beta=float('inf'), shallow_move_ordering=False, quiescent=False):
+        if self is None:
+            return self
+        opposition_team = self.colors[(self.colors.index(team) + 1) % 2]
+        if depth == 0:
+            # TODO: Quiescent search to remove horizon effect:
+            # include, winning captures, pawn promotion
+            # Q-searches are usually not depth-limited, and instead rely on the tree terminating. Trees will
+            # always terminate (usually reasonably quickly) since the number of possible captures are usually
+            # limited, and tend to decrease as captures are made.
+
+            if not quiescent and len(self.dead_pieces[opposition_team]) > len(original_board.dead_pieces[opposition_team]):
+                # Pieces have been captured
+                # Quiescent search
+                return self.minimax(1, opposition_team, not maximiser, self, alpha, beta, shallow_move_ordering, True)
+
             return self
 
         boards = []
@@ -492,7 +517,7 @@ class Board:
 
         if maximiser:
             for board in boards:
-                minimax_board = board.minimax(depth - 1, opposition_team, False, alpha, beta)
+                minimax_board = board.minimax(depth - 1, opposition_team, False, original_board, alpha, beta)
                 if minimax_board is not None:
                     board_score = minimax_board.evaluate_score(team)
                     if board_score > max_value:
@@ -503,7 +528,7 @@ class Board:
                         break
         else:
             for board in boards:
-                minimax_board = board.minimax(depth - 1, opposition_team, True, alpha, beta)
+                minimax_board = board.minimax(depth - 1, opposition_team, True, original_board, alpha, beta)
                 if minimax_board is not None:
                     board_score = minimax_board.evaluate_score(team)
                     if board_score > max_value:

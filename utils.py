@@ -8,9 +8,5 @@ def differences_between_boards(b1, b2):
                 #  moved from row, col to somewhere
                 dest = b2.locate_piece(piece1)
                 differences.append([(row, col), (dest[0], dest[1])])
-            # elif piece1 is not None and piece2 is not None and piece1.display_text != piece2.display_text:
-            #     pass
-                # src = b1.locate_piece(piece2)
-                # differences.append(['X', (src[0], src[1]), (row, col)])
 
     return differences

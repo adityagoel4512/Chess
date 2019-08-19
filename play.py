@@ -11,7 +11,7 @@ def engine_play_engine(minimax_depth):
 
     while not board.check_checkmate(board.colors[(board.move_count-1) % 2]) and board.fifty_move_count < 50:
 
-        board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True)
+        board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True, board)
 
         if board is None:
             print('Draw by stalemate')
@@ -43,14 +43,14 @@ def human_play_engine(minimax_depth, team='W'):
         if board.move_count % 2 == player:
             c1, r1, c2, r2 = list(input('Enter move in format "d2d4" ([src][dst])'))
 
-            row1, col1, row2, col2 = board.rows-int(r1), int(ord(c1)-ALPHA_OFFSET), board.rows-int(r2), int(ord(c2)-ALPHA_OFFSET)
+            row1, col1, row2, col2 = board.rows-int(r1), ord(c1)-ALPHA_OFFSET, board.rows-int(r2), ord(c2)-ALPHA_OFFSET
 
             while not board.move_piece(row1, col1, row2, col2, team, True):
                 print('Invalid Move')
                 c1, r1, c2, r2 = list(input('Enter move in format "d2d4" ([src][dst])'))
-                row1, col1, row2, col2 = board.rows - int(r1), int(ord(c1) - ALPHA_OFFSET), board.rows - int(r2), int(ord(c2) - ALPHA_OFFSET)
+                row1, col1, row2, col2 = board.rows - int(r1), ord(c1) - ALPHA_OFFSET, board.rows - int(r2), ord(c2) - ALPHA_OFFSET
         else:
-            board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True)
+            board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True, board)
 
         if board is None:
             print('Draw by stalemate')
@@ -68,5 +68,6 @@ def human_play_engine(minimax_depth, team='W'):
 
 
 if __name__ == "__main__":
-    human_play_engine(2, 'W')
+    # human_play_engine(2, 'B')
+    engine_play_engine(2)
     print('Done')
