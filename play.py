@@ -64,6 +64,7 @@ def human_play_engine(minimax_depth, team='W'):
             print('Draw by stalemate')
             break
 
+        print(board.export_board_string())
         print(board.colors[(board.move_count-1) % 2] + "'s move. Move " + str(board.move_count) + " at " + str(datetime.datetime.now()) + ".")
         board.update_board_svg("previous_state.svg", old_board_string)
         board.update_board_svg("current_state.svg")

@@ -4,6 +4,8 @@ import chess
 import chess.svg
 import functools
 
+# TODO: Future Tasks
+# Instead of expensive deepcopying and moving, utilising zobrist hashing to make and unmake moves
 
 class Board:
     grid = []
@@ -463,16 +465,20 @@ class Board:
                     valid_moves = self.compute_valid_moves(row, col, piece.team, True)
 
                     if piece.team != team:
-                        safe_spaces -= len(list(filter(lambda pos: 1 < pos[0] < 6 and 1 < pos[1] < 6, valid_moves)))
+                        if 2 < row < 5 and 1 < col < 5:
+                            safe_spaces -= 2.5
+                        safe_spaces -= len(list(filter(lambda pos: 2 < pos[0] < 5 and 1 < pos[1] < 6, valid_moves)))
 
                     if piece.team == team:
-                        safe_spaces += len(list(filter(lambda pos: 1 < pos[0] < 6 and 1 < pos[1] < 6, valid_moves)))
+                        if 2 < row < 5 and 1 < col < 5:
+                            safe_spaces += 2.5
+                        safe_spaces += len(list(filter(lambda pos: 2 < pos[0] < 5 and 1 < pos[1] < 6, valid_moves)))
 
                     if piece.castled is not None and piece.castled:
                         piece_positional_balance += 300
 
                     material_balance += piece_material_balance * factor
-                    positional_balance += (piece_positional_balance * factor) + (safe_spaces * factor * 38) + (strongly_protected * 25) + (weakly_protected_under_attack * 25)
+                    positional_balance += (piece_positional_balance * factor) + (safe_spaces * factor * 120) + (strongly_protected * 25) + (weakly_protected_under_attack * 25)
                     other_defended_pieces_count += piece_other_defended_pieces_count * factor
                     defended_pawns_count += piece_defended_pawns_count * factor
                     net_value_defence_attack += piece_net_value_defence_attack * factor
@@ -494,9 +500,9 @@ class Board:
         if self.position_in_check(team):
             positional_balance -= 300 * dead_pieces
 
-        scale = 600 if dead_pieces > 12 else 3700 - (dead_pieces * 15) - (self.move_count * 13)
+        scale = 2500 if dead_pieces > 12 else 3000 - (dead_pieces * 15) - (self.move_count * 13)
 
-        return 1.2*material_balance + positional_balance + mobility_score + (defended_pawns_count * 50) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.045)
+        return 1.2*material_balance + positional_balance + mobility_score + (defended_pawns_count * 1.75 * scale) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.1)
 
     def search_game_tree(self, start_team, moves, game_boards):
         if moves == 0:
@@ -526,7 +532,7 @@ class Board:
             # Q-searches are usually not depth-limited, and instead rely on the tree terminating. Trees will
             # always terminate (usually reasonably quickly) since the number of possible captures are usually
             # limited, and tend to decrease as captures are made.
-            if not quiescent and (len(self.dead_pieces[opposition_team]) > len(original_board.dead_pieces[opposition_team]) or len(self.dead_pieces[team]) > len(original_board.dead_pieces[team]) or self.promotion_occured[team]):
+            if not quiescent and (len(self.dead_pieces[opposition_team]) > len(original_board.dead_pieces[opposition_team]) or self.promotion_occured[team]):
                 # Pieces have been captured
                 # Quiescent search of just one further ply for now
                 return self.minimax(1, opposition_team, not maximiser, self, alpha, beta, shallow_move_ordering, True)
