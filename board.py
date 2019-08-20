@@ -31,6 +31,7 @@ class Board:
                     self.grid[i].append([self.colors[(i + j) % 2], None])
         else:
             self.grid = grid
+        self.board_text = self.export_board_string()
 
     def __deepcopy__(self, memodict={}):
         copy_grid = []
@@ -60,7 +61,7 @@ class Board:
         black_castle = 'T' if self.can_castle['B'][0] and self.can_castle['B'][1] else 'F'
         near_fifty_move_draw = 'T' if self.fifty_move_count >= 40 else 'F'
         team_promoted = 'T' if self.promotion_occured[team_to_move] else 'F'
-        return hash(self.export_board_string() + white_castle + black_castle + near_fifty_move_draw + team_to_move + team_promoted)
+        return hash(self.board_text + white_castle + black_castle + near_fifty_move_draw + team_to_move + team_promoted)
 
     def clear_board(self):
         for row in self.grid:
@@ -122,7 +123,7 @@ class Board:
 
         self.move_count += 1
         piece.moved = True
-
+        self.board_text = self.export_board_string()
         return True
 
     def setup_pieces(self):
@@ -493,9 +494,9 @@ class Board:
         if self.position_in_check(team):
             positional_balance -= 300 * dead_pieces
 
-        scale = 600 if dead_pieces > 12 else 2700 - (dead_pieces * 15) - (self.move_count * 13)
+        scale = 600 if dead_pieces > 12 else 3700 - (dead_pieces * 15) - (self.move_count * 13)
 
-        return 1.2*material_balance + positional_balance + mobility_score + (defended_pawns_count * 35) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.045)
+        return 1.2*material_balance + positional_balance + mobility_score + (defended_pawns_count * 50) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.045)
 
     def search_game_tree(self, start_team, moves, game_boards):
         if moves == 0:
