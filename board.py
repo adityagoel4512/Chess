@@ -121,7 +121,7 @@ class Board:
             if r2 == self.rows-1 or r2 == 0:
                 # TODO: pawn promotion as part of minimax not automatically choose highest value piece as done here
                 self.set_piece(r2, c2, chess_piece.Piece(team, 'Q', 4))
-                self.promotion_occured = True
+                self.promotion_occured[team] = True
 
         self.move_count += 1
         piece.moved = True
@@ -149,6 +149,7 @@ class Board:
         # King
         self.set_piece(0, 4, chess_piece.Piece('B', self.pieces[5], 1, True))
         self.set_piece(self.rows - 1, 4, chess_piece.Piece('W', self.pieces[5], 0, True))
+        self.board_text = self.export_board_string()
 
     def locate_piece(self, piece):
         assert piece is not None
@@ -475,10 +476,10 @@ class Board:
                         safe_spaces += len(list(filter(lambda pos: 2 < pos[0] < 5 and 1 < pos[1] < 6, valid_moves)))
 
                     if piece.castled is not None and piece.castled:
-                        piece_positional_balance += 300
+                        piece_positional_balance += 450
 
                     material_balance += piece_material_balance * factor
-                    positional_balance += (piece_positional_balance * factor) + (safe_spaces * factor * 120) + (strongly_protected * 25) + (weakly_protected_under_attack * 25)
+                    positional_balance += (piece_positional_balance * factor) + (safe_spaces * factor * 250) + (strongly_protected * 25) - (weakly_protected_under_attack * 60000)
                     other_defended_pieces_count += piece_other_defended_pieces_count * factor
                     defended_pawns_count += piece_defended_pawns_count * factor
                     net_value_defence_attack += piece_net_value_defence_attack * factor
@@ -615,10 +616,8 @@ class Board:
         return board_string
 
     def update_board_svg(self, filename="board.svg", board_string = None):
-        if board_string is None:
-            board_string = self.export_board_string()
 
-        board = chess.Board(board_string)
+        board = chess.Board(self.board_text if board_string is None else board_string)
         svg_text = chess.svg.board(board)
         svg_file = open(filename, "w")
         svg_file.write(svg_text)
