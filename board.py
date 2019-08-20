@@ -2,6 +2,7 @@ import piece as chess_piece
 import piecesquaretables as tables
 import chess
 import chess.svg
+import functools
 
 
 class Board:
@@ -13,7 +14,8 @@ class Board:
     def __init__(self, grid=None, king_pos={'W': [7, 4], 'B': [0, 4]}, move_count=0,
                  can_castle={'W': [False, False], 'B': [False, False]},
                  dead_pieces={'W': [], 'B': []},
-                 fifty_move_count=0):
+                 fifty_move_count=0,
+                 promotion_occured={'W': False, 'B': False}):
 
         self.king_pos = king_pos
         self.move_count = move_count
@@ -21,6 +23,7 @@ class Board:
         self.can_castle = can_castle
         self.dead_pieces = dead_pieces
         self.fifty_move_count = fifty_move_count
+        self.promotion_occured = promotion_occured
         if grid is None:
             for i in range(self.rows):
                 self.grid.append([])
@@ -48,7 +51,16 @@ class Board:
                             'B': list(map(lambda piece: piece.__copy__(), self.dead_pieces['B']))}
         copy_fifty_move_count = self.fifty_move_count
         copy_move_count = self.move_count
-        return Board(copy_grid, copy_king_pos, copy_move_count, copy_can_castle, copy_dead_pieces, copy_fifty_move_count)
+        copy_promotion_occured = {'W': self.promotion_occured['W'], 'B': self.promotion_occured['B']}
+        return Board(copy_grid, copy_king_pos, copy_move_count, copy_can_castle, copy_dead_pieces, copy_fifty_move_count, copy_promotion_occured)
+
+    def __hash__(self):
+        team_to_move = self.colors[(self.move_count-1)%2]
+        white_castle = 'T' if self.can_castle['W'][0] and self.can_castle['W'][1] else 'F'
+        black_castle = 'T' if self.can_castle['B'][0] and self.can_castle['B'][1] else 'F'
+        near_fifty_move_draw = 'T' if self.fifty_move_count >= 40 else 'F'
+        team_promoted = 'T' if self.promotion_occured[team_to_move] else 'F'
+        return hash(self.export_board_string() + white_castle + black_castle + near_fifty_move_draw + team_to_move + team_promoted)
 
     def clear_board(self):
         for row in self.grid:
@@ -106,6 +118,7 @@ class Board:
             if r2 == self.rows-1 or r2 == 0:
                 # TODO: pawn promotion as part of minimax not automatically choose highest value piece as done here
                 self.set_piece(r2, c2, chess_piece.Piece(team, 'Q', 4))
+                self.promotion_occured = True
 
         self.move_count += 1
         piece.moved = True
@@ -326,6 +339,7 @@ class Board:
 
         return valid_moves
 
+    @functools.lru_cache(maxsize=64)
     def evaluate_score(self, team):
         # Three stage evaluation:
         # Stage 1: material and pawn-king structure
@@ -349,6 +363,11 @@ class Board:
 
         # If black piece table needs to be vertically reflected and horizontally reflected
         direction = 1 if team == 'W' else 1
+        # Stockfish tactic to improve opening game by counting safe spaces in center of board
+        safe_spaces = 0
+        # Stockfish tactic to improve piece protection: either protected by pawn, or by two while we protect with one
+        strongly_protected = 0
+        weakly_protected_under_attack = 0
 
         for row in range(self.rows):
             for col in range(self.rows):
@@ -373,7 +392,7 @@ class Board:
                         piece_other_defended_pieces_count -= len(piece.attacked_by) * proportion
                         for i in range(row, self.rows):
                             if self.get_piece(i, col) is None:
-                                piece_positional_balance += 20
+                                piece_positional_balance += 50
 
                     elif piece.piece_type == 'P':
                         piece_defended_pawns_count += len(piece.defended_by)
@@ -406,10 +425,16 @@ class Board:
                         piece_other_defended_pieces_count += len(piece.defended_by) * proportion
                         piece_other_defended_pieces_count -= len(piece.attacked_by) * proportion
 
+                    factor = -1 if piece.team != team else 1
+
                     if piece.attacked_by:
                         attacked_by = []
-                        piece.attacked_by = list(filter(lambda pos: attacked_by.append(pos) if pos not in attacked_by else pos, piece.attacked_by))
+                        piece.attacked_by = list(filter(lambda pos: attacked_by.append(pos) if pos not in attacked_by else pos and self.get_piece(pos[0], pos[1]) is not None, piece.attacked_by))
                         piece.attacked_by = attacked_by
+
+                        if list(filter(lambda pos: self.get_piece(pos[0], pos[1]).piece_type != 'P', piece.attacked_by)) and not (list(filter(lambda pos: self.get_piece(pos[0], pos[1]) is not None and self.get_piece(pos[0], pos[1]).piece_type == 'P', piece.defended_by))
+                                 or (len(piece.defended_by) == 2 and piece is not None and not list(filter(lambda pos: len(self.get_piece(pos[0], pos[1]).defended_by) >= 2, piece.attacked_by)))):
+                            weakly_protected_under_attack += -1 * factor
 
                         king_value = tables.centipawn_piece_dict['K'] + 300
                         for pos in piece.attacked_by:
@@ -420,8 +445,13 @@ class Board:
 
                     if piece.defended_by:
                         defended_by = []
-                        piece.defended_by = list(filter(lambda pos: defended_by.append(pos) if pos not in defended_by else pos, piece.defended_by))
+                        piece.defended_by = list(filter(lambda pos: defended_by.append(pos) if pos not in defended_by else pos and self.get_piece(pos[0], pos[1]) is not None, piece.defended_by))
                         piece.defended_by = defended_by
+
+                        if list(filter(lambda pos: self.get_piece(pos[0], pos[1]) is not None and self.get_piece(pos[0], pos[1]).piece_type == 'P', piece.defended_by)):
+                            strongly_protected += factor * 1
+                        elif len(piece.defended_by) == 2 and piece is not None and not list(filter(lambda pos: len(self.get_piece(pos[0], pos[1]).defended_by) >= 2, piece.attacked_by)):
+                            strongly_protected += factor * 1
 
                         king_value = tables.centipawn_piece_dict['K'] + 300
                         for pos in piece.attacked_by:
@@ -429,20 +459,21 @@ class Board:
 
                         piece.defended_by.clear()
 
-                    if 2 < col < 5:
-                        if 2 < row < 5:
-                            positional_balance += 35
-                        elif 1 < row < 6:
-                            positional_balance += 10
+                    valid_moves = self.compute_valid_moves(row, col, piece.team, True)
+
+                    if piece.team != team:
+                        safe_spaces -= len(list(filter(lambda pos: 1 < pos[0] < 6 and 1 < pos[1] < 6, valid_moves)))
+
+                    if piece.team == team:
+                        safe_spaces += len(list(filter(lambda pos: 1 < pos[0] < 6 and 1 < pos[1] < 6, valid_moves)))
 
                     if piece.castled is not None and piece.castled:
                         piece_positional_balance += 300
 
-                    factor = -1 if piece.team != team else 1
                     material_balance += piece_material_balance * factor
-                    positional_balance += piece_positional_balance * factor
+                    positional_balance += (piece_positional_balance * factor) + (safe_spaces * factor * 38) + (strongly_protected * 25) + (weakly_protected_under_attack * 25)
                     other_defended_pieces_count += piece_other_defended_pieces_count * factor
-                    defended_pawns_count += 1.2 * piece_defended_pawns_count * factor
+                    defended_pawns_count += piece_defended_pawns_count * factor
                     net_value_defence_attack += piece_net_value_defence_attack * factor
 
         # When to avoid, and when to play, for draw
@@ -462,9 +493,9 @@ class Board:
         if self.position_in_check(team):
             positional_balance -= 300 * dead_pieces
 
-        scale = 600 if dead_pieces > 12 else 1200 - (dead_pieces * 10) - (self.move_count * 6)
+        scale = 600 if dead_pieces > 12 else 2700 - (dead_pieces * 15) - (self.move_count * 13)
 
-        return 1.5*material_balance + positional_balance + mobility_score + (defended_pawns_count * 5) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.045)
+        return 1.2*material_balance + positional_balance + mobility_score + (defended_pawns_count * 35) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.045)
 
     def search_game_tree(self, start_team, moves, game_boards):
         if moves == 0:
@@ -483,16 +514,8 @@ class Board:
                             game_boards.append(temp_state)
                         temp_state.search_game_tree(opponent_team, moves - 1, game_boards)
 
-    def number_of_pieces(self, piece_type, team):
-        count = 0
-        for row in range(self.rows):
-            for col in range(self.rows):
-                piece = self.get_piece(row, col)
-                if piece is not None and piece.display_text == team + piece_type:
-                    count += 1
-        return count
-
     def minimax(self, depth, team, maximiser, original_board, alpha=float('-inf'), beta=float('inf'), shallow_move_ordering=False, quiescent=False):
+
         if self is None:
             return self
         opposition_team = self.colors[(self.colors.index(team) + 1) % 2]
@@ -502,13 +525,13 @@ class Board:
             # Q-searches are usually not depth-limited, and instead rely on the tree terminating. Trees will
             # always terminate (usually reasonably quickly) since the number of possible captures are usually
             # limited, and tend to decrease as captures are made.
-            #
-            if not quiescent and (len(self.dead_pieces[opposition_team]) > len(original_board.dead_pieces[opposition_team]) or self.number_of_pieces('Q', team) > 1):
+            if not quiescent and (len(self.dead_pieces[opposition_team]) > len(original_board.dead_pieces[opposition_team]) or len(self.dead_pieces[team]) > len(original_board.dead_pieces[team]) or self.promotion_occured[team]):
                 # Pieces have been captured
-                # Quiescent search of just one further ply
+                # Quiescent search of just one further ply for now
                 return self.minimax(1, opposition_team, not maximiser, self, alpha, beta, shallow_move_ordering, True)
-
             return self
+
+            # return transposition_table[parent_node_hash_key]
 
         boards = []
         self.search_game_tree(team, 1, boards)
@@ -521,7 +544,8 @@ class Board:
 
         if maximiser:
             for board in boards:
-                minimax_board = board.minimax(depth - 1, opposition_team, False, original_board, alpha, beta)
+                minimax_board = board.minimax(depth - 1, opposition_team, False, self, alpha, beta, shallow_move_ordering, quiescent)
+
                 if minimax_board is not None:
                     board_score = minimax_board.evaluate_score(team)
                     if board_score > max_value:
@@ -532,7 +556,8 @@ class Board:
                         break
         else:
             for board in boards:
-                minimax_board = board.minimax(depth - 1, opposition_team, True, original_board, alpha, beta)
+                minimax_board = board.minimax(depth - 1, opposition_team, True, self, alpha, beta, shallow_move_ordering, quiescent)
+
                 if minimax_board is not None:
                     board_score = minimax_board.evaluate_score(team)
                     if board_score > max_value:
@@ -580,7 +605,6 @@ class Board:
         # Only encodes the way the board is represented and not advanced features for chess engine
         # Assumes white is next to play
 
-        print(board_string)
         return board_string
 
     def update_board_svg(self, filename="board.svg", board_string = None):
