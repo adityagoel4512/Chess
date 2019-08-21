@@ -479,8 +479,8 @@ class Board:
                     material_balance += piece_material_balance * factor
                     positional_balance += (piece_positional_balance * factor) + (safe_spaces * factor * 250) + (strongly_protected * 25) - (weakly_protected_under_attack * 60000)
 
-                    other_defended_pieces_count += piece_other_defended_pieces_count * factor
-                    defended_pawns_count += 10 * piece_defended_pawns_count * factor
+                    other_defended_pieces_count += 20 * piece_other_defended_pieces_count * factor
+                    defended_pawns_count += 50 * piece_defended_pawns_count * factor
                     net_value_defence_attack += piece_net_value_defence_attack * factor
 
         # When to avoid, and when to play, for draw
