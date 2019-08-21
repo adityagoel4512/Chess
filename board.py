@@ -20,7 +20,7 @@ class Board:
                  can_castle={'W': [False, False], 'B': [False, False]},
                  dead_pieces={'W': [], 'B': []},
                  fifty_move_count=0,
-                 promotion_occured={'W': False, 'B': False}):
+                 promotion_occured={'W': False, 'B': False}, board_string=None):
 
         self.king_pos = king_pos
         self.move_count = move_count
@@ -36,7 +36,10 @@ class Board:
                     self.grid[i].append([self.colors[(i + j) % 2], None])
         else:
             self.grid = grid
-            self.board_text = self.export_board_string()
+        if board_string is None:
+            self.recompute_board_string()
+        else:
+            self.board_text = board_string
 
     def __deepcopy__(self, memodict={}):
         copy_grid = []
@@ -58,7 +61,7 @@ class Board:
         copy_fifty_move_count = self.fifty_move_count
         copy_move_count = self.move_count
         copy_promotion_occured = {'W': self.promotion_occured['W'], 'B': self.promotion_occured['B']}
-        return Board(copy_grid, copy_king_pos, copy_move_count, copy_can_castle, copy_dead_pieces, copy_fifty_move_count, copy_promotion_occured)
+        return Board(copy_grid, copy_king_pos, copy_move_count, copy_can_castle, copy_dead_pieces, copy_fifty_move_count, copy_promotion_occured, self.board_text)
 
     def __hash__(self):
         team_to_move = self.colors[(self.move_count-1)%2]
@@ -153,7 +156,7 @@ class Board:
         # King
         self.set_piece(0, 4, chess_piece.Piece('B', self.pieces[5], 1, True))
         self.set_piece(self.rows - 1, 4, chess_piece.Piece('W', self.pieces[5], 0, True))
-        self.board_text = self.export_board_string()
+        self.board_text = self.recompute_board_string()
 
     def locate_piece(self, piece):
         assert piece is not None
@@ -457,9 +460,9 @@ class Board:
                         piece.defended_by = defended_by
 
                         if list(filter(lambda pos: self.get_piece(pos[0], pos[1]) is not None and self.get_piece(pos[0], pos[1]).piece_type == 'P', piece.defended_by)):
-                            strongly_protected += factor * 1
+                            strongly_protected += factor
                         elif len(piece.defended_by) == 2 and piece is not None and not list(filter(lambda pos: len(self.get_piece(pos[0], pos[1]).defended_by) >= 2, piece.attacked_by)):
-                            strongly_protected += factor * 1
+                            strongly_protected += factor
 
                         king_value = tables.centipawn_piece_dict['K'] + 300
                         for pos in piece.attacked_by:
@@ -469,15 +472,16 @@ class Board:
 
                     valid_moves = self.compute_valid_moves(row, col, piece.team, True)
 
-                    if 2 < row < 5 and 1 < col < 5:
+                    if 2 < row < 5 and 2 < col < 5:
                         safe_spaces += 5 * factor
-                        safe_spaces += 2 * len(list(filter(lambda pos: 2 < pos[0] < 5 and 1 < pos[1] < 6, valid_moves))) * factor
+
+                    safe_spaces += 1 * len(list(filter(lambda pos: 2 < pos[0] < 5 and 1 < pos[1] < 6, valid_moves))) * factor
 
                     if piece.castled is not None and piece.castled:
-                        piece_positional_balance += 450
+                        piece_positional_balance += 450 * factor
 
                     material_balance += piece_material_balance * factor
-                    positional_balance += (piece_positional_balance * factor) + (safe_spaces * factor * 250) + (strongly_protected * 25) - (weakly_protected_under_attack * 60000)
+                    positional_balance += (piece_positional_balance * factor) + (safe_spaces * 250) + (strongly_protected * 25) - (weakly_protected_under_attack * 60000)
 
                     other_defended_pieces_count += 20 * piece_other_defended_pieces_count * factor
                     defended_pawns_count += 50 * piece_defended_pawns_count * factor
@@ -496,13 +500,13 @@ class Board:
         dead_pieces = len(self.dead_pieces['W']) + len(self.dead_pieces['B'])
 
         if self.position_in_check(opposition):
-            positional_balance += 300 * dead_pieces
+            positional_balance += 350 * dead_pieces
         if self.position_in_check(team):
-            positional_balance -= 300 * dead_pieces
+            positional_balance -= 350 * dead_pieces
 
-        scale = 2500 if dead_pieces > 12 else 3000 - (dead_pieces * 15) - (self.move_count * 13)
+        scale = 2500 if dead_pieces > 12 else 4000 - (dead_pieces * 15) - (self.move_count * 13)
 
-        return 1.2*material_balance + positional_balance + mobility_score + (defended_pawns_count * 1.75 * scale) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.1)
+        return material_balance + positional_balance + mobility_score + (defended_pawns_count * 1.75 * scale) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.1)
 
     def search_game_tree(self, start_team, moves, game_boards):
         def search(root, start_team, moves):
@@ -599,7 +603,7 @@ class Board:
             print(*row)
         print('\n')
 
-    def export_board_string(self):
+    def recompute_board_string(self):
         board_string = ""
         for row in range(self.rows):
             empty_count = 0
