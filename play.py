@@ -58,6 +58,9 @@ def human_play_engine(minimax_depth, team='W'):
         else:
             board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True, board)
             print(chessboard.Board.evaluate_score.cache_info())
+            print(chessboard.Board.minimax.cache_info())
+            print(chessboard.Board.compute_valid_moves.cache_info())
+
 
         # print(len(transposition_table))
         if board is None:
