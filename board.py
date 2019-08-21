@@ -8,7 +8,9 @@ import math
 # TODO: Future Tasks
 # Instead of expensive deepcopying and moving, utilising zobrist hashing to make and unmake moves
 
+
 class Board:
+
     grid = []
     rows = 8
     colors = ['W', 'B']
@@ -60,10 +62,10 @@ class Board:
 
     def __hash__(self):
         team_to_move = self.colors[(self.move_count-1)%2]
-        white_castle = 'T' if self.can_castle['W'][0] and self.can_castle['W'][1] else 'F'
-        black_castle = 'T' if self.can_castle['B'][0] and self.can_castle['B'][1] else 'F'
+        white_castle = str(self.can_castle['W'][0] and self.can_castle['W'][1])
+        black_castle = str(self.can_castle['B'][0] and self.can_castle['B'][1])
         near_fifty_move_draw = 'T' if self.fifty_move_count >= 40 else 'F'
-        team_promoted = 'T' if self.promotion_occured[team_to_move] else 'F'
+        team_promoted = str(self.promotion_occured[team_to_move])
         return hash("".join((self.board_text, white_castle, black_castle, near_fifty_move_draw, team_to_move, team_promoted)))
 
     def clear_board(self):
@@ -120,52 +122,15 @@ class Board:
         if piece.piece_type == 'P':
             self.fifty_move_count = 0
             if r2 == self.rows-1 or r2 == 0:
-                # TODO: pawn promotion as part of minimax not automatically choose highest value piece as done here
+                # TODO: pawn promotion as part of engine decision making and not automatically choosing queen over knight
                 self.set_piece(r2, c2, chess_piece.Piece(team, 'Q', 4))
                 self.promotion_occured[team] = True
 
         self.move_count += 1
         piece.moved = True
 
-        self.fast_board_string_update(r1, c1, r2, c2, piece.piece_type if piece.team == 'W' else piece.piece_type.lower())
+        self.incremental_board_string_update(r1, c1, r2, c2, piece.piece_type if piece.team == 'W' else piece.piece_type.lower())
         return True
-
-    def fast_board_string_update(self, r1, c1, r2, c2, src_text):
-        board_string_by_row = self.board_text.split('/')
-
-        for i in range(self.rows):
-            if board_string_by_row[r1][i].isdigit() and int(board_string_by_row[r1][i]) > 1:
-                expansion = ''.join(['1' for j in range(int(board_string_by_row[r1][i]))])
-                board_string_by_row[r1] = ''.join(
-                    (board_string_by_row[r1][:i], expansion, board_string_by_row[r1][i + 1:]))
-
-            if board_string_by_row[r2][i].isdigit() and int(board_string_by_row[r2][i]) > 1:
-                expansion = ''.join(['1' for j in range(int(board_string_by_row[r2][i]))])
-                board_string_by_row[r2] = ''.join(
-                    (board_string_by_row[r2][:i], expansion, board_string_by_row[r2][i + 1:]))
-
-        board_string_by_row[r2] = ''.join((board_string_by_row[r2][:c2], src_text, board_string_by_row[r2][c2 + 1:]))
-        board_string_by_row[r1] = ''.join((board_string_by_row[r1][:c1], '1', board_string_by_row[r1][c1 + 1:]))
-
-        i = 0
-        while i < len(board_string_by_row[r2]):
-            if board_string_by_row[r2][i] == '1':
-                count = 1
-                while i + count < len(board_string_by_row[r2]) and board_string_by_row[r2][i + count] == '1':
-                    count += 1
-                board_string_by_row[r2] = ''.join((board_string_by_row[r2][:i], str(count), board_string_by_row[r2][i + count:]))
-            i += 1
-
-        i = 0
-        while i < len(board_string_by_row[r1]):
-            if board_string_by_row[r1][i] == '1':
-                count = 1
-                while i + count < len(board_string_by_row[r1]) and board_string_by_row[r1][i + count] == '1':
-                    count += 1
-                board_string_by_row[r1] = ''.join((board_string_by_row[r1][:i], str(count), board_string_by_row[r1][i + count:]))
-            i += 1
-
-        self.board_text = '/'.join(board_string_by_row)
 
     def setup_pieces(self):
         for i in range(self.rows):
@@ -255,7 +220,7 @@ class Board:
                 temp_state.set_piece(r1, 0, None)
         return temp_state.in_range(move[0], move[1]) and temp_state.position_in_check(piece.team)
 
-    @functools.lru_cache(maxsize=64)
+    # @functools.lru_cache(maxsize=64)
     def compute_valid_moves(self, r1, c1, team, filter_check_moves):
         # Filter check moves imposes recursion depth also
         piece = self.get_piece(r1, c1)
@@ -383,7 +348,6 @@ class Board:
 
         return valid_moves
 
-    @functools.lru_cache(maxsize=64)
     def evaluate_score(self, team):
         # Three stage evaluation:
         # Stage 1: material and pawn-king structure
@@ -461,7 +425,7 @@ class Board:
                                               self.get_piece(direction * 1 + row, col),
                                               self.get_piece(direction * 1 + row, col + 1)]
 
-                        piece_positional_balance += len(list(filter(lambda p: p is not None and p.team == team, front_three_pieces))) * 300
+                        piece_positional_balance += len(list(filter(lambda p: p is not None and p.team == team, front_three_pieces))) * 400
                         piece_other_defended_pieces_count += len(piece.defended_by) * proportion
                         piece_other_defended_pieces_count -= len(piece.attacked_by) * proportion
 
@@ -478,7 +442,7 @@ class Board:
 
                         if list(filter(lambda pos: self.get_piece(pos[0], pos[1]).piece_type != 'P', piece.attacked_by)) and not (list(filter(lambda pos: self.get_piece(pos[0], pos[1]) is not None and self.get_piece(pos[0], pos[1]).piece_type == 'P', piece.defended_by))
                                  or (len(piece.defended_by) == 2 and piece is not None and not list(filter(lambda pos: len(self.get_piece(pos[0], pos[1]).defended_by) >= 2, piece.attacked_by)))):
-                            weakly_protected_under_attack += -1 * factor
+                            weakly_protected_under_attack += factor
 
                         king_value = tables.centipawn_piece_dict['K'] + 300
                         for pos in piece.attacked_by:
@@ -505,27 +469,18 @@ class Board:
 
                     valid_moves = self.compute_valid_moves(row, col, piece.team, True)
 
-                    if piece.team != team:
-                        if 2 < row < 5 and 1 < col < 5:
-                            safe_spaces -= 2.5
-                        safe_spaces -= len(list(filter(lambda pos: 2 < pos[0] < 5 and 1 < pos[1] < 6, valid_moves)))
-
-                    if piece.team == team:
-                        if 2 < row < 5 and 1 < col < 5:
-                            safe_spaces += 2.5
-                        safe_spaces += len(list(filter(lambda pos: 2 < pos[0] < 5 and 1 < pos[1] < 6, valid_moves)))
+                    if 2 < row < 5 and 1 < col < 5:
+                        safe_spaces += 5 * factor
+                        safe_spaces += 2 * len(list(filter(lambda pos: 2 < pos[0] < 5 and 1 < pos[1] < 6, valid_moves))) * factor
 
                     if piece.castled is not None and piece.castled:
                         piece_positional_balance += 450
 
                     material_balance += piece_material_balance * factor
-                    positional_balance += (piece_positional_balance * factor)\
-                                          + (safe_spaces * factor * 250)\
-                                          + (strongly_protected * 25)\
-                                          - (weakly_protected_under_attack * 60000)
+                    positional_balance += (piece_positional_balance * factor) + (safe_spaces * factor * 250) + (strongly_protected * 25) - (weakly_protected_under_attack * 60000)
 
                     other_defended_pieces_count += piece_other_defended_pieces_count * factor
-                    defended_pawns_count += piece_defended_pawns_count * factor
+                    defended_pawns_count += 10 * piece_defended_pawns_count * factor
                     net_value_defence_attack += piece_net_value_defence_attack * factor
 
         # When to avoid, and when to play, for draw
@@ -550,7 +505,6 @@ class Board:
         return 1.2*material_balance + positional_balance + mobility_score + (defended_pawns_count * 1.75 * scale) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.1)
 
     def search_game_tree(self, start_team, moves, game_boards):
-        @functools.lru_cache(maxsize=64)
         def search(root, start_team, moves):
             if moves == 0:
                 return
@@ -569,10 +523,8 @@ class Board:
                             temp_state.search_game_tree(opponent_team, moves - 1, game_boards)
 
         search(self, start_team, moves)
-        print(search.cache_info())
         return game_boards
 
-    @functools.lru_cache(maxsize=64)
     def minimax(self, depth, team, maximiser, original_board, alpha=float('-inf'), beta=float('inf'), shallow_move_ordering=False, quiescent=False):
         if self is None:
             return self
@@ -631,6 +583,14 @@ class Board:
         print(list(map(lambda piece: piece.display_text, self.dead_pieces['W'])))
         print(list(map(lambda piece: piece.display_text, self.dead_pieces['B'])))
 
+    def clear_all_defending_attacking(self):
+        for row in range(self.rows):
+            for col in range(self.rows):
+                piece = self.get_piece(row, col)
+                if piece is not None:
+                    piece.attacked_by.clear()
+                    piece.defended_by.clear()
+
     # Prints to terminal a representation of board if board.svg unviewable
     def display_board(self):
         print('\n')
@@ -651,7 +611,8 @@ class Board:
                     if empty_count != 0:
                         board_string = "".join((board_string, str(empty_count)))
                         empty_count = 0
-                    board_string = "".join((board_string, piece.piece_type.lower())) if piece.team == 'B' else "".join((board_string, piece.piece_type))
+                    board_string = "".join((board_string, piece.piece_type.lower())) if piece.team == 'B' else "".join(
+                        (board_string, piece.piece_type))
 
                 if col == self.rows - 1 and empty_count != 0:
                     board_string = "".join((board_string, str(empty_count)))
@@ -665,8 +626,46 @@ class Board:
 
         return board_string
 
-    def update_board_svg(self, filename="board.svg", board_string = None):
+    def incremental_board_string_update(self, r1, c1, r2, c2, src_text):
+        board_string_by_row = self.board_text.split('/')
 
+        for i in range(self.rows):
+            if board_string_by_row[r1][i].isdigit() and int(board_string_by_row[r1][i]) > 1:
+                expansion = ''.join(['1' for j in range(int(board_string_by_row[r1][i]))])
+                board_string_by_row[r1] = ''.join(
+                    (board_string_by_row[r1][:i], expansion, board_string_by_row[r1][i + 1:]))
+
+            if board_string_by_row[r2][i].isdigit() and int(board_string_by_row[r2][i]) > 1:
+                expansion = ''.join(['1' for j in range(int(board_string_by_row[r2][i]))])
+                board_string_by_row[r2] = ''.join(
+                    (board_string_by_row[r2][:i], expansion, board_string_by_row[r2][i + 1:]))
+
+        board_string_by_row[r2] = ''.join((board_string_by_row[r2][:c2], src_text, board_string_by_row[r2][c2 + 1:]))
+        board_string_by_row[r1] = ''.join((board_string_by_row[r1][:c1], '1', board_string_by_row[r1][c1 + 1:]))
+
+        i = 0
+        while i < len(board_string_by_row[r2]):
+            if board_string_by_row[r2][i] == '1':
+                count = 1
+                while i + count < len(board_string_by_row[r2]) and board_string_by_row[r2][i + count] == '1':
+                    count += 1
+                board_string_by_row[r2] = ''.join(
+                    (board_string_by_row[r2][:i], str(count), board_string_by_row[r2][i + count:]))
+            i += 1
+
+        i = 0
+        while i < len(board_string_by_row[r1]):
+            if board_string_by_row[r1][i] == '1':
+                count = 1
+                while i + count < len(board_string_by_row[r1]) and board_string_by_row[r1][i + count] == '1':
+                    count += 1
+                board_string_by_row[r1] = ''.join(
+                    (board_string_by_row[r1][:i], str(count), board_string_by_row[r1][i + count:]))
+            i += 1
+
+        self.board_text = '/'.join(board_string_by_row)
+
+    def update_board_svg(self, filename="board.svg", board_string=None):
         board = chess.Board(self.board_text if board_string is None else board_string)
         svg_text = chess.svg.board(board)
         svg_file = open(filename, "w")
@@ -696,17 +695,6 @@ class Board:
             self.set_piece(row, col, chess_piece.Piece('W', row_string[0], 3, False, True))
             col += 1
         self.import_board_row([row_string[i] for i in range(1, len(row_string))], row, col)
-
-    def clear_all_defending_attacking(self):
-        for row in range(self.rows):
-            for col in range(self.rows):
-                piece = self.get_piece(row, col)
-                if piece is not None:
-                    piece.attacked_by.clear()
-                    piece.defended_by.clear()
-
-
-
 
 
 

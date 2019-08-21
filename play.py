@@ -19,6 +19,7 @@ def engine_play_engine(minimax_depth):
             print('Draw by stalemate')
             break
 
+        # print(chessboard.Board.compute_valid_moves.cache_info())
         print(board.colors[(board.move_count-1) % 2] + "'s move. Move " + str(board.move_count) + " at " + str(datetime.datetime.now()) + ".")
         board.update_board_svg("board" + str(board.move_count) + ".svg")
         board.clear_all_defending_attacking()
@@ -38,7 +39,6 @@ def human_play_engine(minimax_depth, team='W'):
     board.update_board_svg("current_state.svg")
 
     player = board.colors.index(team)
-    rough_eval_table = {}
 
     while not board.check_checkmate(board.colors[(board.move_count-1) % 2]) and board.fifty_move_count < 50:
 
@@ -57,12 +57,8 @@ def human_play_engine(minimax_depth, team='W'):
                 row1, col1, row2, col2 = board.rows - int(r1), ord(c1) - ALPHA_OFFSET, board.rows - int(r2), ord(c2) - ALPHA_OFFSET
         else:
             board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True, board)
-            print(chessboard.Board.evaluate_score.cache_info())
-            print(chessboard.Board.minimax.cache_info())
-            print(chessboard.Board.compute_valid_moves.cache_info())
+            # print(chessboard.Board.compute_valid_moves.cache_info())
 
-
-        # print(len(transposition_table))
         if board is None:
             print('Draw by stalemate')
             break
