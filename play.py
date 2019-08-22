@@ -1,6 +1,6 @@
 import sys
 import datetime
-import board as chessboard
+from board import Board
 import functools
 from svg import update_board_svg
 
@@ -8,7 +8,7 @@ ALPHA_OFFSET = ord('a')
 
 
 def engine_play_engine(minimax_depth):
-    board = chessboard.Board()
+    board = Board()
     board.setup_pieces()
     update_board_svg(board, "board" + str(board.move_count) + ".svg")
 
@@ -20,7 +20,7 @@ def engine_play_engine(minimax_depth):
             print('Draw by stalemate')
             break
 
-        # print(chessboard.Board.compute_valid_moves.cache_info())
+        # print(Board.compute_valid_moves.cache_info())
         print(board.colors[(board.move_count-1) % 2] + "'s move. Move " + str(board.move_count) + " at " + str(datetime.datetime.now()) + ".")
         update_board_svg(board, "board" + str(board.move_count) + ".svg")
         board.clear_all_defending_attacking()
@@ -32,7 +32,7 @@ def engine_play_engine(minimax_depth):
 
 
 def human_play_engine(minimax_depth, team='W'):
-    board = chessboard.Board()
+    board = Board()
     board.setup_pieces()
 
     print('You are ' + team)
@@ -58,7 +58,7 @@ def human_play_engine(minimax_depth, team='W'):
                 row1, col1, row2, col2 = board.rows - int(r1), ord(c1) - ALPHA_OFFSET, board.rows - int(r2), ord(c2) - ALPHA_OFFSET
         else:
             board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True, board)
-            # print(chessboard.Board.compute_valid_moves.cache_info())
+            # print(Board.compute_valid_moves.cache_info())
 
         if board is None:
             print('Draw by stalemate')
