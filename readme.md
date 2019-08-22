@@ -9,8 +9,8 @@ Board Representation
 --------------------
 Object array.
 
-I've opted to not go for a bitboard representation to make the program as short and simple as possible in the interest
-of beginner to chess programming level readability and time to complete work, even at the expense of speed of the engine.
+I've opted to not go for a bitboard representation to make the program as short and simple as possible, even at the
+expense of speed of the engine.
 
 Search
 ------
