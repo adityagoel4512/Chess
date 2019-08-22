@@ -2,7 +2,7 @@ AdiChess
 ========
 
 A simple purely Python chess engine.
-Inspired by Sunfish, it's designed to be extremely an extremely dense implementation
+Inspired by Sunfish, it's designed to be extremely an short and readable implementation
 of a chess engine and very tunable too.
 
 Board Representation
