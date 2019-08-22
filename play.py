@@ -1,7 +1,6 @@
 import sys
 import datetime
 from board import Board
-import functools
 from svg import update_board_svg
 
 ALPHA_OFFSET = ord('a')

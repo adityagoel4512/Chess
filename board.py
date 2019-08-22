@@ -1,5 +1,5 @@
 from piece import Piece
-import piecesquaretables as tables
+from agent import Agent
 import functools
 
 # TODO: Future Tasks
@@ -26,6 +26,7 @@ class Board:
         self.dead_pieces = dead_pieces
         self.fifty_move_count = fifty_move_count
         self.promotion_occured = promotion_occured
+        self.agents = {'W': Agent('W'), 'B': Agent('B', {"mobility":4, "safespaces":260, "otherdefendedcount":20, "pawndefendedcount":65, "netvalue":1, "scaleinitial":3400, "check":400, "centreposition":6, "draw":1500, "castling":600, "stronglyprotected":40, "weaklyprotectedattacked":80000, "deadpiecescalefactor":10, "movescalefactor":30, "scalemin":2750})}
         if grid is None:
             for i in range(self.rows):
                 self.grid.append([])
@@ -348,161 +349,6 @@ class Board:
         return valid_moves
 
     # @set_hyperparams
-    def evaluate_score(self, team):
-        # Three stage evaluation:
-        # Stage 1: material and pawn-king structure
-        # Stage 2: dynamic piece-square tables
-        # Stage 3: mobility and board control (no of available moves high is valuable)
-
-        # TODO: Passed pawns, King Safety and Pawn Structure.
-        # TODO: pawn rams, pawn levers, duo trio quart
-
-        opposition = self.colors[(self.colors.index(team) + 1) % 2]
-
-        if self.check_checkmate(opposition):
-            return float('inf')
-        further_moves = []
-        self.search_game_tree(team, 1, further_moves)
-        mobility_score = len(further_moves) * 3
-
-        material_balance, positional_balance, defended_pawns_count, other_defended_pieces_count, net_value_defence_attack = 0, 0, 0, 0, 0
-        bishop_count = {team: 0, opposition: 0}
-
-        # If black piece table needs to be vertically reflected and horizontally reflected
-        direction = 1 if team == 'W' else 1
-        # Stockfish tactic to improve opening game by counting safe spaces in center of board
-        safe_spaces = 0
-        # Stockfish tactic to improve piece protection: either protected by pawn, or by two while we protect with one
-        strongly_protected = 0
-        weakly_protected_under_attack = 0
-
-        for row in range(self.rows):
-            for col in range(self.rows):
-                piece = self.get_piece(row, col)
-                color_based_access = [[row, col], [self.rows - 1 - row, self.rows - 1 - col]] if team == 'W' else [[self.rows - 1 - row, self.rows - 1 - col], [row, col]]
-                if piece is None:
-                    pass
-                else:
-                    piece_material_balance, piece_positional_balance, piece_defended_pawns_count, piece_other_defended_pieces_count, piece_net_value_defence_attack = 0, 0, 0, 0, 0
-                    piece_material_balance += tables.centipawn_piece_dict[piece.piece_type]
-                    piece_positional_balance += tables.centipawn_position_dict[piece.piece_type][color_based_access[0][0]][color_based_access[0][1]]
-                    proportion = tables.centipawn_piece_dict[piece.piece_type]*2 / tables.centipawn_piece_dict['Q'] if piece.piece_type != 'K' else 0.01
-
-                    if piece.piece_type == 'B':
-                        piece_other_defended_pieces_count += len(piece.defended_by) * proportion
-                        piece_other_defended_pieces_count -= len(piece.attacked_by) * proportion
-                        bishop_count[piece.team] += 1
-                        if bishop_count[piece.team] == 2:
-                            material_balance += 60
-                    elif piece.piece_type == 'R':
-                        piece_other_defended_pieces_count += len(piece.defended_by) * proportion
-                        piece_other_defended_pieces_count -= len(piece.attacked_by) * proportion
-                        for i in range(row, self.rows):
-                            if self.get_piece(i, col) is None:
-                                piece_positional_balance += 50
-
-                    elif piece.piece_type == 'P':
-                        piece_defended_pawns_count += len(piece.defended_by)
-                    elif piece.piece_type == 'K':
-                        # King protection
-                        flank_protection = [False, False]
-
-                        for i in range(col, self.rows):
-                            temp_piece = self.get_piece(row, i)
-                            if self.get_piece(row, i) is not None and temp_piece.team == team:
-                                flank_protection[1] = True
-                                break
-                        for i in range(0, col):
-                            temp_piece = self.get_piece(row, i)
-                            if self.get_piece(row, i) is not None and temp_piece.team == team:
-                                flank_protection[0] = True
-                                break
-
-                        piece_positional_balance += len(list(filter(lambda protected: protected, flank_protection))) * 125
-
-                        front_three_pieces = [self.get_piece(direction * 1 + row, col - 1),
-                                              self.get_piece(direction * 1 + row, col),
-                                              self.get_piece(direction * 1 + row, col + 1)]
-
-                        piece_positional_balance += len(list(filter(lambda p: p is not None and p.team == team, front_three_pieces))) * 400
-                        piece_other_defended_pieces_count += len(piece.defended_by) * proportion
-                        piece_other_defended_pieces_count -= len(piece.attacked_by) * proportion
-
-                    else:
-                        piece_other_defended_pieces_count += len(piece.defended_by) * proportion
-                        piece_other_defended_pieces_count -= len(piece.attacked_by) * proportion
-
-                    factor = -1 if piece.team != team else 1
-
-                    if piece.attacked_by:
-                        attacked_by = []
-                        piece.attacked_by = list(filter(lambda pos: attacked_by.append(pos) if pos not in attacked_by else pos and self.get_piece(pos[0], pos[1]) is not None, piece.attacked_by))
-                        piece.attacked_by = attacked_by
-
-                        if list(filter(lambda pos: self.get_piece(pos[0], pos[1]).piece_type != 'P', piece.attacked_by)) and not (list(filter(lambda pos: self.get_piece(pos[0], pos[1]) is not None and self.get_piece(pos[0], pos[1]).piece_type == 'P', piece.defended_by))
-                                 or (len(piece.defended_by) == 2 and piece is not None and not list(filter(lambda pos: len(self.get_piece(pos[0], pos[1]).defended_by) >= 2, piece.attacked_by)))):
-                            weakly_protected_under_attack += factor
-
-                        king_value = tables.centipawn_piece_dict['K'] + 300
-                        for pos in piece.attacked_by:
-                            piece_net_value_defence_attack -= king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
-
-                        piece_net_value_defence_attack -= tables.centipawn_piece_dict[piece.piece_type] * 1.2
-                        piece.attacked_by.clear()
-
-                    if piece.defended_by:
-                        defended_by = []
-                        piece.defended_by = list(filter(lambda pos: defended_by.append(pos) if pos not in defended_by else pos and self.get_piece(pos[0], pos[1]) is not None, piece.defended_by))
-                        piece.defended_by = defended_by
-
-                        if list(filter(lambda pos: self.get_piece(pos[0], pos[1]) is not None and self.get_piece(pos[0], pos[1]).piece_type == 'P', piece.defended_by)):
-                            strongly_protected += factor
-                        elif len(piece.defended_by) == 2 and piece is not None and not list(filter(lambda pos: len(self.get_piece(pos[0], pos[1]).defended_by) >= 2, piece.attacked_by)):
-                            strongly_protected += factor
-
-                        king_value = tables.centipawn_piece_dict['K'] + 300
-                        for pos in piece.attacked_by:
-                            piece_net_value_defence_attack += king_value - tables.centipawn_piece_dict[self.get_piece(pos[0], pos[1]).piece_type]
-
-                        piece.defended_by.clear()
-
-                    valid_moves = self.compute_valid_moves(row, col, piece.team, True)
-
-                    if 2 < row < 5 and 2 < col < 5:
-                        safe_spaces += 5 * factor
-
-                    safe_spaces += 1 * len(list(filter(lambda pos: 2 < pos[0] < 5 and 1 < pos[1] < 6, valid_moves))) * factor
-
-                    if piece.castled is not None and piece.castled:
-                        piece_positional_balance += 450 * factor
-
-                    material_balance += piece_material_balance * factor
-                    positional_balance += (piece_positional_balance * factor) + (safe_spaces * 250) + (strongly_protected * 25) - (weakly_protected_under_attack * 60000)
-
-                    other_defended_pieces_count += 20 * piece_other_defended_pieces_count * factor
-                    defended_pawns_count += 50 * piece_defended_pawns_count * factor
-                    net_value_defence_attack += piece_net_value_defence_attack * factor
-
-        # When to avoid, and when to play, for draw
-
-        if self.fifty_move_count > 46:
-            if len(self.dead_pieces[team]) < len(self.dead_pieces[opposition]):
-                positional_balance -= 2000
-            else:
-                positional_balance += 2000
-
-        # Go for check, especially towards end:
-
-        dead_pieces = len(self.dead_pieces['W']) + len(self.dead_pieces['B'])
-
-        if self.position_in_check(opposition):
-            positional_balance += 350 * dead_pieces
-        if self.position_in_check(team):
-            positional_balance -= 350 * dead_pieces
-
-        scale = 2500 if dead_pieces > 12 else 4000 - (dead_pieces * 15) - (self.move_count * 13)
-
-        return material_balance + positional_balance + mobility_score + (defended_pawns_count * 1.75 * scale) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.1)
 
     def search_game_tree(self, start_team, moves, game_boards):
         if moves == 0:
@@ -546,14 +392,14 @@ class Board:
         max_board = None
 
         if shallow_move_ordering:
-            boards.sort(key=lambda board: board.evaluate_score(team), reverse=True)
+            boards.sort(key=lambda board: self.agents[team].evaluate_score(self), reverse=True)
 
         if maximiser:
             for board in boards:
                 minimax_board = board.minimax(depth - 1, opposition_team, False, self, alpha, beta, shallow_move_ordering, quiescent)
 
                 if minimax_board is not None:
-                    board_score = minimax_board.evaluate_score(team)
+                    board_score = self.agents[team].evaluate_score(minimax_board)
                     if board_score > max_value:
                         max_value = board_score
                         max_board = board
@@ -565,7 +411,7 @@ class Board:
                 minimax_board = board.minimax(depth - 1, opposition_team, True, self, alpha, beta, shallow_move_ordering, quiescent)
 
                 if minimax_board is not None:
-                    board_score = minimax_board.evaluate_score(team)
+                    board_score = self.agents[team].evaluate_score(minimax_board)
                     if board_score > max_value:
                         max_value = board_score
                         max_board = minimax_board
