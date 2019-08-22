@@ -1,9 +1,6 @@
-import piece as chess_piece
+from piece import Piece
 import piecesquaretables as tables
-import chess
-import chess.svg
 import functools
-import math
 
 # TODO: Future Tasks
 # Instead of expensive deepcopying and moving, utilising zobrist hashing to make and unmake moves
@@ -39,6 +36,9 @@ class Board:
         if board_string is None:
             self.recompute_board_string()
         else:
+            # Print board string if you want to reconstruct this board state at a separate point with import_board.
+            # Only encodes the way the board is represented and not advanced features for chess engine
+            # Assume white is next to play
             self.board_text = board_string
 
     def __deepcopy__(self, memodict={}):
@@ -126,7 +126,7 @@ class Board:
             self.fifty_move_count = 0
             if r2 == self.rows-1 or r2 == 0:
                 # TODO: pawn promotion as part of engine decision making and not automatically choosing queen over knight
-                self.set_piece(r2, c2, chess_piece.Piece(team, 'Q', 4))
+                self.set_piece(r2, c2, Piece(team, 'Q', 4))
                 self.promotion_occured[team] = True
 
         self.move_count += 1
@@ -137,25 +137,25 @@ class Board:
 
     def setup_pieces(self):
         for i in range(self.rows):
-            self.set_piece(6, i, chess_piece.Piece('W', 'P', i))
-            self.set_piece(1, i, chess_piece.Piece('B', 'P', i))
+            self.set_piece(6, i, Piece('W', 'P', i))
+            self.set_piece(1, i, Piece('B', 'P', i))
 
         # Rooks, Knights, Bishops
         i = 0
         while i < 3:
-            self.set_piece(0, i, chess_piece.Piece('B', self.pieces[i + 1], i))
-            self.set_piece(0, self.rows - (i + 1), chess_piece.Piece('B', self.pieces[i + 1], i + 4))
-            self.set_piece(self.rows - 1, i, chess_piece.Piece('W', self.pieces[i + 1], i))
-            self.set_piece(self.rows - 1, self.rows - (i + 1), chess_piece.Piece('W', self.pieces[i + 1], i + 4))
+            self.set_piece(0, i, Piece('B', self.pieces[i + 1], i))
+            self.set_piece(0, self.rows - (i + 1), Piece('B', self.pieces[i + 1], i + 4))
+            self.set_piece(self.rows - 1, i, Piece('W', self.pieces[i + 1], i))
+            self.set_piece(self.rows - 1, self.rows - (i + 1), Piece('W', self.pieces[i + 1], i + 4))
             i += 1
 
         # Queen
-        self.set_piece(0, 3, chess_piece.Piece('B', self.pieces[4], 1))
-        self.set_piece(self.rows - 1, 3, chess_piece.Piece('W', self.pieces[4], 0))
+        self.set_piece(0, 3, Piece('B', self.pieces[4], 1))
+        self.set_piece(self.rows - 1, 3, Piece('W', self.pieces[4], 0))
 
         # King
-        self.set_piece(0, 4, chess_piece.Piece('B', self.pieces[5], 1, True))
-        self.set_piece(self.rows - 1, 4, chess_piece.Piece('W', self.pieces[5], 0, True))
+        self.set_piece(0, 4, Piece('B', self.pieces[5], 1, True))
+        self.set_piece(self.rows - 1, 4, Piece('W', self.pieces[5], 0, True))
         self.board_text = self.recompute_board_string()
 
     def locate_piece(self, piece):
@@ -180,10 +180,7 @@ class Board:
                 temp_piece = self.get_piece(row, col)
                 if temp_piece is not None and temp_piece.team != king_piece.team:
                     if list(filter(lambda pos: pos == [r1, c1], self.compute_valid_moves(row, col, temp_piece.team, False))):
-                        if not king_piece.attacked_by:
-                            self.display_board()
                         return True
-
         return False
 
     def check_checkmate(self, side):
@@ -309,7 +306,6 @@ class Board:
                         self.get_piece(r1 + (sign[0] * i), c1 + (sign[1] * i)).defended_by.append([r1, c1])
 
         if piece.piece_type == 'K':
-            # Disallow moves that result in check
             for row in range(r1 - 1, r1 + 2):
                 for col in range(c1 - 1, c1 + 2):
                     if self.in_range(row, col):
@@ -338,8 +334,7 @@ class Board:
                         self.can_castle[team][0] = False
                         pass
                 far_left_piece = self.get_piece(r1, 0)
-                self.can_castle[team][0] = self.can_castle[team][
-                                               0] and far_left_piece is not None and far_left_piece.piece_type == 'R' and far_left_piece.team == team and not far_left_piece.moved
+                self.can_castle[team][0] = self.can_castle[team][0] and far_left_piece is not None and far_left_piece.piece_type == 'R' and far_left_piece.team == team and not far_left_piece.moved
 
                 if self.can_castle[team][1]:
                     valid_moves.append([r1, c1 + 2])
@@ -347,10 +342,12 @@ class Board:
                     valid_moves.append([r1, c1 - 2])
 
         if filter_check_moves:
+            # Disallow moves that result in check
             valid_moves = list(filter(lambda move: self.in_range(move[0], move[1]) and not self.results_in_check(r1, c1, move, not filter_check_moves), valid_moves))
 
         return valid_moves
 
+    # @set_hyperparams
     def evaluate_score(self, team):
         # Three stage evaluation:
         # Stage 1: material and pawn-king structure
@@ -364,7 +361,6 @@ class Board:
 
         if self.check_checkmate(opposition):
             return float('inf')
-
         further_moves = []
         self.search_game_tree(team, 1, further_moves)
         mobility_score = len(further_moves) * 3
@@ -509,25 +505,21 @@ class Board:
         return material_balance + positional_balance + mobility_score + (defended_pawns_count * 1.75 * scale) + (other_defended_pieces_count * scale) + (net_value_defence_attack * 0.1)
 
     def search_game_tree(self, start_team, moves, game_boards):
-        def search(root, start_team, moves):
-            if moves == 0:
-                return
-            opponent_team = root.colors[(root.colors.index(start_team) + 1) % len(root.colors)]
-            for row in range(root.rows):
-                for col in range(root.rows):
-                    piece = self.get_piece(row, col)
-                    if piece is not None and piece.team == start_team:
-                        valid_moves = self.compute_valid_moves(row, col, start_team, True)
-                        for move in valid_moves:
-                            temp_state = self.__deepcopy__()
-                            temp_state.move_piece(row, col, move[0], move[1], start_team, True)
-                            temp_state.clear_all_defending_attacking()
-                            if moves == 1 and temp_state is not None:
-                                game_boards.append(temp_state)
-                            temp_state.search_game_tree(opponent_team, moves - 1, game_boards)
-
-        search(self, start_team, moves)
-        return game_boards
+        if moves == 0:
+            return
+        opponent_team = self.colors[(self.colors.index(start_team) + 1) % 2]
+        for row in range(self.rows):
+            for col in range(self.rows):
+                piece = self.get_piece(row, col)
+                if piece is not None and piece.team == start_team:
+                    valid_moves = self.compute_valid_moves(row, col, start_team, True)
+                    for move in valid_moves:
+                        temp_state = self.__deepcopy__()
+                        temp_state.move_piece(row, col, move[0], move[1], start_team, True)
+                        temp_state.clear_all_defending_attacking()
+                        if moves == 1 and temp_state is not None:
+                            game_boards.append(temp_state)
+                        temp_state.search_game_tree(opponent_team, moves - 1, game_boards)
 
     def minimax(self, depth, team, maximiser, original_board, alpha=float('-inf'), beta=float('inf'), shallow_move_ordering=False, quiescent=False):
         if self is None:
@@ -583,10 +575,6 @@ class Board:
 
         return max_board
 
-    def display_dead_pieces(self):
-        print(list(map(lambda piece: piece.display_text, self.dead_pieces['W'])))
-        print(list(map(lambda piece: piece.display_text, self.dead_pieces['B'])))
-
     def clear_all_defending_attacking(self):
         for row in range(self.rows):
             for col in range(self.rows):
@@ -594,14 +582,6 @@ class Board:
                 if piece is not None:
                     piece.attacked_by.clear()
                     piece.defended_by.clear()
-
-    # Prints to terminal a representation of board if board.svg unviewable
-    def display_board(self):
-        print('\n')
-        for i in range(self.rows):
-            row = map(lambda pos: pos if pos[1] is None else [pos[0], pos[1].display_text], self.grid[i])
-            print(*row)
-        print('\n')
 
     def recompute_board_string(self):
         board_string = ""
@@ -623,10 +603,6 @@ class Board:
                     empty_count = 0
             if row < self.rows - 1:
                 board_string = "".join((board_string, "/"))
-
-        # Prints board string if we want to reconstruct this board state at a separate point with import_board.
-        # Only encodes the way the board is represented and not advanced features for chess engine
-        # Assume white is next to play
 
         return board_string
 
@@ -669,36 +645,7 @@ class Board:
 
         self.board_text = '/'.join(board_string_by_row)
 
-    def update_board_svg(self, filename="board.svg", board_string=None):
-        board = chess.Board(self.board_text if board_string is None else board_string)
-        svg_text = chess.svg.board(board)
-        svg_file = open(filename, "w")
-        svg_file.write(svg_text)
-        svg_file.close()
 
-    def import_board(self, board_string):
-        # Pre: assumes board_string well formed.
-        # Format is the same as the Python Chess library.
-        board_string = board_string.split('/')
-        for row in range(len(board_string)):
-            row_string = list(board_string[row])
-            self.import_board_row(row_string, row)
-
-    def import_board_row(self, row_string, row, col=0):
-        if not row_string:
-            return
-        if row_string[0].isdigit():
-            spaces = int(row_string[0])
-            for i in range(spaces):
-                self.set_piece(row, col + i, None)
-            col += spaces
-        if row_string[0].islower():
-            self.set_piece(row, col, chess_piece.Piece('B', row_string[0].upper(), 3, False, True))
-            col += 1
-        if row_string[0].isupper():
-            self.set_piece(row, col, chess_piece.Piece('W', row_string[0], 3, False, True))
-            col += 1
-        self.import_board_row([row_string[i] for i in range(1, len(row_string))], row, col)
 
 
 

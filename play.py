@@ -2,6 +2,7 @@ import sys
 import datetime
 import board as chessboard
 import functools
+from svg import update_board_svg
 
 ALPHA_OFFSET = ord('a')
 
@@ -9,7 +10,7 @@ ALPHA_OFFSET = ord('a')
 def engine_play_engine(minimax_depth):
     board = chessboard.Board()
     board.setup_pieces()
-    board.update_board_svg("board" + str(board.move_count) + ".svg")
+    update_board_svg(board, "board" + str(board.move_count) + ".svg")
 
     while not board.check_checkmate(board.colors[(board.move_count-1) % 2]) and board.fifty_move_count < 50:
 
@@ -21,7 +22,7 @@ def engine_play_engine(minimax_depth):
 
         # print(chessboard.Board.compute_valid_moves.cache_info())
         print(board.colors[(board.move_count-1) % 2] + "'s move. Move " + str(board.move_count) + " at " + str(datetime.datetime.now()) + ".")
-        board.update_board_svg("board" + str(board.move_count) + ".svg")
+        update_board_svg(board, "board" + str(board.move_count) + ".svg")
         board.clear_all_defending_attacking()
 
     if board.fifty_move_count >= 50:
@@ -36,7 +37,7 @@ def human_play_engine(minimax_depth, team='W'):
 
     print('You are ' + team)
 
-    board.update_board_svg("current_state.svg")
+    update_board_svg(board, "current_state.svg")
 
     player = board.colors.index(team)
 
@@ -65,8 +66,8 @@ def human_play_engine(minimax_depth, team='W'):
 
         print(board.export_board_string())
         print(board.colors[(board.move_count-1) % 2] + "'s move. Move " + str(board.move_count) + " at " + str(datetime.datetime.now()) + ".")
-        board.update_board_svg("previous_state.svg", old_board_string)
-        board.update_board_svg("current_state.svg")
+        update_board_svg(board, "previous_state.svg", old_board_string)
+        update_board_svg(board, "current_state.svg")
         board.clear_all_defending_attacking()
 
     if board.fifty_move_count >= 50:
