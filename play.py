@@ -17,7 +17,9 @@ def engine_play_engine(minimax_depth):
 
         if board is None:
             print('Draw by stalemate')
-            break
+            print(board.agents['W'].hyperparameters)
+            print(board.agents['B'].hyperparameters)
+            return
 
         # print(Board.compute_valid_moves.cache_info())
         print(board.colors[(board.move_count-1) % 2] + "'s move. Move " + str(board.move_count) + " at " + str(datetime.datetime.now()) + ".")
@@ -27,7 +29,8 @@ def engine_play_engine(minimax_depth):
     if board.fifty_move_count >= 50:
         print('Draw by 50 move rule')
     else:
-        print(board.colors[board.move_count% 2] + " wins!")
+        print(board.colors[board.move_count % 2] + " wins!")
+        print(board.agents[board.colors[board.move_count % 2]].hyperparameters)
 
 
 def human_play_engine(minimax_depth, team='W'):

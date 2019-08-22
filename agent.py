@@ -7,22 +7,11 @@ class Agent:
         self.team = team
 
         if not hyperparameters:
-            self.hyperparameters = {}
-            self.hyperparameters['mobility'] = 3
-            self.hyperparameters['safespaces'] = 250
-            self.hyperparameters['otherdefendedcount'] = 20
-            self.hyperparameters['pawndefendedcount'] = 65
-            self.hyperparameters['netvalue'] = 0.1
-            self.hyperparameters['scaleinitial'] = 4000
-            self.hyperparameters['check'] = 350
-            self.hyperparameters['centreposition'] = 3
-            self.hyperparameters['draw'] = 2000
-            self.hyperparameters['castling'] = 450
-            self.hyperparameters['stronglyprotected'] = 25
-            self.hyperparameters['weaklyprotectedattacked'] = 60000
-            self.hyperparameters['deadpiecescalefactor'] = 15
-            self.hyperparameters['movescalefactor'] = 13
-            self.hyperparameters['scalemin'] = 2500
+            self.hyperparameters = {'mobility': 3, 'safespaces': 250, 'otherdefendedcount': 20, 'pawndefendedcount': 65,
+                                    'netvalue': 0.1, 'scaleinitial': 4000, 'check': 350, 'centreposition': 3,
+                                    'draw': 2000, 'castling': 450, 'stronglyprotected': 25,
+                                    'weaklyprotectedattacked': 60000, 'deadpiecescalefactor': 15, 'movescalefactor': 13,
+                                    'scalemin': 2500}
         else:
             self.hyperparameters = hyperparameters
 
