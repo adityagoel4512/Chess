@@ -13,7 +13,7 @@ def engine_play_engine(minimax_depth):
 
     while not board.check_checkmate(board.colors[(board.move_count-1) % 2]) and board.fifty_move_count < 50:
 
-        board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True, board)
+        board = board.make_move(minimax_depth, board.colors[board.move_count % 2], True, board)
 
         if board is None:
             print('Draw by stalemate')
@@ -59,7 +59,7 @@ def human_play_engine(minimax_depth, team='W'):
                 c1, r1, c2, r2 = list(input('Enter move in format "d2d4" ([src][dst])'))
                 row1, col1, row2, col2 = board.rows - int(r1), ord(c1) - ALPHA_OFFSET, board.rows - int(r2), ord(c2) - ALPHA_OFFSET
         else:
-            board = board.minimax(minimax_depth, board.colors[board.move_count % 2], True, board)
+            board = board.make_move(minimax_depth, board.colors[board.move_count % 2], True, board)
             # print(Board.compute_valid_moves.cache_info())
 
         if board is None:

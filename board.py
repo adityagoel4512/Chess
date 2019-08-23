@@ -26,7 +26,15 @@ class Board:
         self.dead_pieces = dead_pieces
         self.fifty_move_count = fifty_move_count
         self.promotion_occured = promotion_occured
-        self.agents = {'W': Agent('W'), 'B': Agent('B', {"mobility":4, "safespaces":260, "otherdefendedcount":20, "pawndefendedcount":65, "netvalue":1, "scaleinitial":3400, "check":400, "centreposition":6, "draw":1500, "castling":600, "stronglyprotected":40, "weaklyprotectedattacked":80000, "deadpiecescalefactor":10, "movescalefactor":30, "scalemin":2750})}
+        self.agents = {'W': Agent('W'),
+                       'B': Agent('B', {'mobility': 4, 'safespaces': 350, 'otherdefendedcount': 35,
+                                        'pawndefendedcount': 60, 'netvalue': 15, 'scaleinitial': 3400, 'check': 1800,
+                                        'centreposition': 9, 'draw': 1500, 'castling': 600, 'stronglyprotected': 40,
+                                        'weaklyprotectedattacked': 850000, 'deadpiecescalefactor': 10,
+                                        'movescalefactor': 30, 'scalemin': 2750, 'materialbalance': 10000010,
+                                        'positionalbalance': 1, 'relativepiecevalues':
+                                        {'P': 1, 'N': 3, 'B': 5, 'R': 5.5, 'Q': 21, 'K': 1000000},
+                                        'kingthreeshield': 600, 'flankprotectionking': 125})}
         if grid is None:
             for i in range(self.rows):
                 self.grid.append([])
@@ -70,7 +78,7 @@ class Board:
         black_castle = str(self.can_castle['B'][0] and self.can_castle['B'][1])
         near_fifty_move_draw = 'T' if self.fifty_move_count >= 40 else 'F'
         team_promoted = str(self.promotion_occured[team_to_move])
-        return hash("".join((self.board_text, white_castle, black_castle, near_fifty_move_draw, team_to_move, team_promoted)))
+        return hash(''.join((self.board_text, white_castle, black_castle, near_fifty_move_draw, team_to_move, team_promoted)))
 
     def clear_board(self):
         for row in self.grid:
@@ -367,59 +375,64 @@ class Board:
                             game_boards.append(temp_state)
                         temp_state.search_game_tree(opponent_team, moves - 1, game_boards)
 
-    def minimax(self, depth, team, maximiser, original_board, alpha=float('-inf'), beta=float('inf'), shallow_move_ordering=False, quiescent=False):
-        if self is None:
-            return self
-        opposition_team = self.colors[(self.colors.index(team) + 1) % 2]
-        if depth == 0:
-            # TODO: Quiescent search to remove horizon effect:
-            # include, winning captures, pawn promotion
-            # Q-searches are usually not depth-limited, and instead rely on the tree terminating. Trees will
-            # always terminate (usually reasonably quickly) since the number of possible captures are usually
-            # limited, and tend to decrease as captures are made.
-            if not quiescent and (len(self.dead_pieces[opposition_team]) > len(original_board.dead_pieces[opposition_team]) or self.promotion_occured[team]):
-                # Pieces have been captured
-                # Quiescent search of just one further ply for now
-                return self.minimax(1, opposition_team, not maximiser, self, alpha, beta, shallow_move_ordering, True)
-            return self
+    def make_move(self, depth, team, maximiser, original_board):
+        agent = self.agents[team]
 
-            # return transposition_table[parent_node_hash_key]
+        def minimax(self, depth, team, maximiser, original_board, alpha=float('-inf'), beta=float('inf'), shallow_move_ordering=False, quiescent=False):
+            if self is None:
+                return self
+            opposition_team = self.colors[(self.colors.index(team) + 1) % 2]
+            if depth == 0:
+                # TODO: Quiescent search to remove horizon effect:
+                # include, winning captures, pawn promotion
+                # Q-searches are usually not depth-limited, and instead rely on the tree terminating. Trees will
+                # always terminate (usually reasonably quickly) since the number of possible captures are usually
+                # limited, and tend to decrease as captures are made.
+                if not quiescent and (len(self.dead_pieces[opposition_team]) > len(original_board.dead_pieces[opposition_team]) or self.promotion_occured[team]):
+                    # Pieces have been captured
+                    # Quiescent search of just one further ply for now
+                    return minimax(self, 1, opposition_team, not maximiser, self, alpha, beta, shallow_move_ordering, True)
+                return self
 
-        boards = []
-        self.search_game_tree(team, 1, boards)
-        boards = list(filter(lambda board: board is not None, boards))
-        max_value = float('-inf')
-        max_board = None
+                # return transposition_table[parent_node_hash_key]
 
-        if shallow_move_ordering:
-            boards.sort(key=lambda board: self.agents[team].evaluate_score(self), reverse=True)
+            boards = []
+            self.search_game_tree(team, 1, boards)
+            boards = list(filter(lambda b: b is not None, boards))
+            max_value = float('-inf')
+            max_board = None
 
-        if maximiser:
-            for board in boards:
-                minimax_board = board.minimax(depth - 1, opposition_team, False, self, alpha, beta, shallow_move_ordering, quiescent)
+            if shallow_move_ordering:
+                boards.sort(key=lambda board: agent.evaluate_score(self, team), reverse=True)
 
-                if minimax_board is not None:
-                    board_score = self.agents[team].evaluate_score(minimax_board)
-                    if board_score > max_value:
-                        max_value = board_score
-                        max_board = board
-                    alpha = max(alpha, max_value)
-                    if beta <= alpha:
-                        break
-        else:
-            for board in boards:
-                minimax_board = board.minimax(depth - 1, opposition_team, True, self, alpha, beta, shallow_move_ordering, quiescent)
+            if maximiser:
+                for board in boards:
+                    minimax_board = minimax(board, depth - 1, opposition_team, False, self, alpha, beta, shallow_move_ordering, quiescent)
 
-                if minimax_board is not None:
-                    board_score = self.agents[team].evaluate_score(minimax_board)
-                    if board_score > max_value:
-                        max_value = board_score
-                        max_board = minimax_board
-                    beta = min(beta, max_value)
-                    if beta <= alpha:
-                        break
+                    if minimax_board is not None:
+                        board_score = agent.evaluate_score(minimax_board, team)
+                        if board_score > max_value:
+                            max_value = board_score
+                            max_board = board
+                        alpha = max(alpha, max_value)
+                        if beta <= alpha:
+                            break
+            else:
+                for board in boards:
+                    minimax_board = minimax(board, depth - 1, opposition_team, True, self, alpha, beta, shallow_move_ordering, quiescent)
 
-        return max_board
+                    if minimax_board is not None:
+                        board_score = agent.evaluate_score(minimax_board, team)
+                        if board_score > max_value:
+                            max_value = board_score
+                            max_board = minimax_board
+                        beta = min(beta, max_value)
+                        if beta <= alpha:
+                            break
+
+            return max_board
+
+        return minimax(self, depth, team, maximiser, original_board)
 
     def clear_all_defending_attacking(self):
         for row in range(self.rows):
@@ -430,7 +443,7 @@ class Board:
                     piece.defended_by.clear()
 
     def recompute_board_string(self):
-        board_string = ""
+        board_string = ''
         for row in range(self.rows):
             empty_count = 0
             for col in range(self.rows):
@@ -439,16 +452,16 @@ class Board:
                     empty_count += 1
                 else:
                     if empty_count != 0:
-                        board_string = "".join((board_string, str(empty_count)))
+                        board_string = ''.join((board_string, str(empty_count)))
                         empty_count = 0
-                    board_string = "".join((board_string, piece.piece_type.lower())) if piece.team == 'B' else "".join(
+                    board_string = ''.join((board_string, piece.piece_type.lower())) if piece.team == 'B' else ''.join(
                         (board_string, piece.piece_type))
 
                 if col == self.rows - 1 and empty_count != 0:
-                    board_string = "".join((board_string, str(empty_count)))
+                    board_string = ''.join((board_string, str(empty_count)))
                     empty_count = 0
             if row < self.rows - 1:
-                board_string = "".join((board_string, "/"))
+                board_string = ''.join((board_string, '/'))
 
         return board_string
 
