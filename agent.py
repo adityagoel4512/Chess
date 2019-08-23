@@ -5,6 +5,7 @@ class Agent:
 
     def __init__(self, team, hyperparameters={}):
         self.team = team
+        self.endgame = False
         if not hyperparameters:
             self.hyperparameters = {'mobility': 3, 'safespaces': 250, 'otherdefendedcount': 20, 'pawndefendedcount': 65,
                                     'netvalue': 0.1, 'scaleinitial': 4000, 'check': 500, 'centreposition': 3,
@@ -16,18 +17,32 @@ class Agent:
         else:
             self.hyperparameters = hyperparameters
 
+    def in_endgame(self, board):
+        # Open files, low material total.
+        open_files = [True for _ in range(board.rows)]
+        for row in range(board.rows):
+            for col in range(board.rows):
+                open_files[col] = open_files[col] and board.get_piece(row, col) is None
+        open_files = len(list(filter(lambda file: file, open_files)))
+        return open_files > 3 and len(board.dead_pieces['W']) + len(board.dead_pieces['B']) > 11
+
     def evaluate_score(self, board, team):
         # Three stage evaluation:
         # Stage 1: material and pawn-king structure
         # Stage 2: dynamic piece-square tables
         # Stage 3: mobility and board control (no of available moves high is valuable)
-        # TODO: Passed pawns, King Safety and Pawn St   ructure.
+        # TODO: Passed pawns, King Safety and Pawn Structure.
         # TODO: pawn rams, pawn levers, duo trio quart
+        self.endgame = self.in_endgame(board)
+        if self.endgame:
+            tables.centipawn_position_dict['K'] = tables.king_endgame_table
+            self.hyperparameters['relativepiecevalues']['P'] *= 1.8
 
         opposition = board.colors[(board.colors.index(team) + 1) % 2]
 
         if board.check_checkmate(opposition):
             return float('inf')
+
         further_moves = []
         board.search_game_tree(team, 1, further_moves)
         mobility_score = len(further_moves) * self.hyperparameters['mobility']
@@ -71,6 +86,8 @@ class Agent:
 
                     elif piece.piece_type == 'P':
                         piece_defended_pawns_count += len(piece.defended_by)
+                        if self.endgame:
+                            piece_positional_balance += row * 5 if piece.team == 'B' else board.rows - row
                     elif piece.piece_type == 'K':
                         # King protection
                         flank_protection = [False, False]

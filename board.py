@@ -28,13 +28,13 @@ class Board:
         self.promotion_occured = promotion_occured
         self.agents = {'W': Agent('W'),
                        'B': Agent('B', {'mobility': 4, 'safespaces': 350, 'otherdefendedcount': 35,
-                                        'pawndefendedcount': 60, 'netvalue': 15, 'scaleinitial': 3400, 'check': 1800,
+                                        'pawndefendedcount': 60, 'netvalue': 22, 'scaleinitial': 3400, 'check': 1800,
                                         'centreposition': 9, 'draw': 1500, 'castling': 600, 'stronglyprotected': 40,
                                         'weaklyprotectedattacked': 850000, 'deadpiecescalefactor': 10,
-                                        'movescalefactor': 30, 'scalemin': 2750, 'materialbalance': 10000010,
+                                        'movescalefactor': 30, 'scalemin': 2750, 'materialbalance': 11100010,
                                         'positionalbalance': 1, 'relativepiecevalues':
                                         {'P': 1, 'N': 3, 'B': 5, 'R': 5.5, 'Q': 21, 'K': 1000000},
-                                        'kingthreeshield': 600, 'flankprotectionking': 125})}
+                                        'kingthreeshield': 650, 'flankprotectionking': 105})}
         if grid is None:
             for i in range(self.rows):
                 self.grid.append([])
@@ -390,8 +390,8 @@ class Board:
                 # limited, and tend to decrease as captures are made.
                 if not quiescent and (len(self.dead_pieces[opposition_team]) > len(original_board.dead_pieces[opposition_team]) or self.promotion_occured[team]):
                     # Pieces have been captured
-                    # Quiescent search of just one further ply for now
-                    return minimax(self, 1, opposition_team, not maximiser, self, alpha, beta, shallow_move_ordering, True)
+                    # Quiescent search of 3 further ply for now
+                    return minimax(self, 3, opposition_team, not maximiser, self, alpha, beta, shallow_move_ordering, True)
                 return self
 
                 # return transposition_table[parent_node_hash_key]
